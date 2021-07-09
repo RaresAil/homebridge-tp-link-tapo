@@ -1,0 +1,49 @@
+{
+  "private": false,
+  "displayName": "TPLink Smart Lights",
+  "name": "homebridge-tplink-smart-light",
+  "version": "1.0.0",
+  "description": "A platform to implement the tplink light bulbs",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/USERNAME/GITHUB_PROJECT_NAME.git"
+  },
+  "bugs": {
+    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME/issues"
+  },
+  "engines": {
+    "node": ">=10.17.0",
+    "homebridge": ">=1.3.0"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon src/index.ts",
+    "lint": "eslint src/**.ts --max-warnings=0",
+    "watch": "npm run build && npm link && nodemon",
+    "build": "rimraf ./dist && tsc",
+    "prepublishOnly": "npm run lint && npm run build"
+  },
+  "keywords": [
+    "homebridge-plugin"
+  ],
+  "dependencies": {
+    "async-lock": "^1.3.0",
+    "node-fetch": "^2.6.1",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "@types/async-lock": "^1.1.3",
+    "@types/node": "^16.0.1",
+    "@types/node-fetch": "^2.5.11",
+    "@types/uuid": "^8.3.1",
+    "@typescript-eslint/eslint-plugin": "^4.16.1",
+    "@typescript-eslint/parser": "^4.16.1",
+    "eslint": "^7.21.0",
+    "homebridge": "^1.3.1",
+    "nodemon": "^2.0.7",
+    "rimraf": "^3.0.2",
+    "ts-node": "^10.0.0",
+    "typescript": "^4.2.2"
+  }
+}

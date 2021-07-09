@@ -1,0 +1,39 @@
+{
+  "pluginAlias": "HomebridgeTPLinkLights",
+  "pluginType": "platform",
+  "singular": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "required": true,
+        "description": "TPLink Light Bulbs"
+      },
+      "email": {
+        "title": "Email",
+        "type": "string",
+        "required": true,
+        "description": "TPLink's account email."
+      },
+      "password": {
+        "title": "Password",
+        "type": "string",
+        "required": true,
+        "description": "TPLink's account password"
+      },
+      "addresses": {
+        "title": "Addresses",
+        "required": true,
+        "uniqueItems": true,
+        "type": "array",
+        "description": "A list of IPs for each light bulb",
+        "items": {
+          "title": "Ip Address",
+          "type": "string"
+        }
+      }
+    }
+  }
+}
