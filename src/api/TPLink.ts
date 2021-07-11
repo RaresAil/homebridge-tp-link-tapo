@@ -32,6 +32,7 @@ export default class TPLink {
   private classSetup = false;
 
   private loginToken?: string;
+  private tryResendCommand = false;
 
   private infoCache?: {
     data: DeviceInfo;
@@ -82,36 +83,59 @@ export default class TPLink {
     command: T,
     ...args: Parameters<Commands[T]>
   ): Promise<CommandReturnType<T>> {
-    return this.lock.acquire('send-command', async () => {
-      if (!commands[command.toString()]) {
-        return false as CommandReturnType<T>;
+    return this.lock.acquire(
+      'send-command',
+      (): Promise<CommandReturnType<T>> => {
+        return this.sendCommandWithNoLock(command, ...args);
+      }
+    );
+  }
+
+  private async sendCommandWithNoLock<T extends Command>(
+    command: T,
+    ...args: Parameters<Commands[T]>
+  ): Promise<CommandReturnType<T>> {
+    if (!commands[command.toString()]) {
+      return false as CommandReturnType<T>;
+    }
+
+    if (!this.loginToken || this.needsNewHandshake() || this.tryResendCommand) {
+      this.log.info('Trying to login again.');
+      await this.login();
+    }
+
+    const { __method__, ...params } = commands[command.toString()](...args);
+
+    const { body } = await this.sendSecureRequest(
+      __method__ ?? 'set_device_info',
+      params,
+      true
+    );
+
+    if (body.error_code && body.error_code !== 0) {
+      if (!this.tryResendCommand && `${body.error_code}` === '9999') {
+        this.tryResendCommand = true;
+        this.log.info('Session expired');
+        return this.sendCommandWithNoLock(command, ...args);
       }
 
-      if (!this.loginToken || this.needsNewHandshake()) {
-        await this.login();
-      }
+      this.log.error('Command error:', command, '>', body.error_code);
+    }
 
-      const { __method__, ...params } = commands[command.toString()](...args);
-
-      const { body } = await this.sendSecureRequest(
-        __method__ ?? 'set_device_info',
-        params,
-        true
-      );
-
-      if (body.error_code && body.error_code !== 0) {
-        this.log.error('Command error:', command, '>', body.error_code);
-      }
-
-      return (body?.result ?? body?.error_code === 0) as CommandReturnType<T>;
-    });
+    this.tryResendCommand = false;
+    return (body?.result ?? body?.error_code === 0) as CommandReturnType<T>;
   }
 
   private async login() {
-    const { body } = await this.sendSecureRequest('login_device', {
-      username: this.email,
-      password: this.password
-    });
+    const { body } = await this.sendSecureRequest(
+      'login_device',
+      {
+        username: this.email,
+        password: this.password
+      },
+      false,
+      true
+    );
 
     this.loginToken = body?.result?.token;
   }
@@ -147,10 +171,15 @@ export default class TPLink {
     params: {
       [key: string]: any;
     },
-    useToken = false
+    useToken = false,
+    forceHandshake = false
   ) {
-    if (this.needsNewHandshake()) {
+    if (forceHandshake) {
       await this.handshake();
+    } else {
+      if (this.needsNewHandshake()) {
+        await this.handshake();
+      }
     }
 
     const url = new URL(
