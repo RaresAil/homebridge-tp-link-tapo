@@ -100,7 +100,10 @@ export default class TPLink {
     }
 
     if (!this.loginToken || this.needsNewHandshake() || this.tryResendCommand) {
-      this.log.info('Trying to login again.');
+      if (this.tryResendCommand) {
+        this.log.info('Trying to login again.');
+      }
+
       await this.login();
     }
 
