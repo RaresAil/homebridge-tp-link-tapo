@@ -1,13 +1,12 @@
 import AsyncLock from 'async-lock';
-import fetch from 'node-fetch';
 import crypto from 'crypto';
-import { URL } from 'url';
+import axios from 'axios';
 import { v4 } from 'uuid';
 
 import DeviceInfo from './@types/DeviceInfo';
 import TpLinkCipher from './TpLinkCipher';
-import commands from './commands';
 import { Logger } from 'homebridge';
+import commands from './commands';
 
 export interface HandshakeData {
   cookie?: string;
@@ -150,23 +149,24 @@ export default class TPLink {
     },
     setCookie = false
   ) {
-    const url = new URL(`http://${this.ip}/app`);
-    return fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(setCookie && this.handshakeData.cookie
-          ? {
-              Cookie: this.handshakeData.cookie
-            }
-          : {})
-      },
-      method: 'POST',
-      body: JSON.stringify({
+    return axios.post(
+      `http://${this.ip}/app`,
+      JSON.stringify({
         method,
         params,
         requestTimeMils: Date.now()
-      })
-    });
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(setCookie && this.handshakeData.cookie
+            ? {
+                Cookie: this.handshakeData.cookie
+              }
+            : {})
+        }
+      }
+    );
   }
 
   private async sendSecureRequest(
@@ -176,7 +176,7 @@ export default class TPLink {
     },
     useToken = false,
     forceHandshake = false
-  ) {
+  ): Promise<any> {
     if (forceHandshake) {
       await this.handshake();
     } else {
@@ -185,16 +185,9 @@ export default class TPLink {
       }
     }
 
-    const url = new URL(
-      `http://${this.ip}/app${useToken ? `?token=${this.loginToken!}` : ''}`
-    );
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        Cookie: this.handshakeData.cookie!
-      },
-      method: 'POST',
-      body: JSON.stringify({
+    const response = await axios.post(
+      `http://${this.ip}/app${useToken ? `?token=${this.loginToken!}` : ''}`,
+      JSON.stringify({
         method: 'securePassthrough',
         params: {
           request: this.tpLinkCipher!.encrypt(
@@ -206,10 +199,16 @@ export default class TPLink {
             })
           )
         }
-      })
-    });
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: this.handshakeData.cookie!
+        }
+      }
+    );
 
-    let body = await response.json();
+    let body = response?.data;
     if (body?.result?.response) {
       body = JSON.parse(this.tpLinkCipher!.decrypt(body.result.response));
     }
@@ -245,9 +244,9 @@ export default class TPLink {
       key: this.publicKey!
     });
 
-    const key = (await response.json())?.result?.key;
+    const key = response?.data?.result?.key;
     const [cookie, timeout] =
-      response.headers.get('set-cookie')?.split(';') ?? [];
+      response?.headers?.['set-cookie']?.[0]?.split(';') ?? [];
     const expire = parseInt((timeout ?? '').split('=')[1] ?? '0');
 
     this.handshakeData.expire = Date.now() + expire * 1000;

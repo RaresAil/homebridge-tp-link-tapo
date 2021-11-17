@@ -152,7 +152,7 @@ export default class Platform implements DynamicPlatformPlugin {
       return this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
         accessory
       ]);
-    } catch (err) {
+    } catch (err: any) {
       this.log.error('Failed to get info about:', ip, '|', err.message);
       this.deviceRetry[uuid] -= 1;
       return await this.loadDevice(ip, email, password);
