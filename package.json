@@ -2,7 +2,7 @@
   "private": false,
   "displayName": "TPLink Smart Lights",
   "name": "homebridge-tplink-smart-light",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "A platform to implement the tplink light bulbs",
   "license": "Apache-2.0",
   "repository": {
