@@ -1,10 +1,4 @@
-import {
-  // AdaptiveLightingControllerMode,
-  PlatformAccessory,
-  Characteristic,
-  Service,
-  Logger
-} from 'homebridge';
+import { PlatformAccessory, Characteristic, Service, Logger } from 'homebridge';
 
 import ColorTemperature from './characteristics/ColorTemperature';
 import { HOME_KIT_VALUES } from './utils/translateColorTemp';
