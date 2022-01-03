@@ -1,20 +1,27 @@
 import {
-  Characteristic,
-  CharacteristicValue,
-  Logger,
+  // AdaptiveLightingControllerMode,
   PlatformAccessory,
-  Service
+  Characteristic,
+  Service,
+  Logger
 } from 'homebridge';
 
+import ColorTemperature from './characteristics/ColorTemperature';
+import { HOME_KIT_VALUES } from './utils/translateColorTemp';
+import Brightness from './characteristics/Brightness';
+import Saturation from './characteristics/Saturation';
+import Hue from './characteristics/Hue';
 import Context from './@types/Context';
+import On from './characteristics/On';
 import TPLink from './api/TPLink';
 import Platform from './platform';
-import {
-  HOME_KIT_VALUES,
-  toHomeKitValues,
-  toTPLinkValues,
-  TP_LINK_VALUES
-} from './utils/translateColorTemp';
+
+export type AccessoryThisType = ThisType<{
+  readonly powerChar: Characteristic;
+  saturation: number;
+  tpLink: TPLink;
+  hue: number;
+}>;
 
 export default class LightBulbAccessory {
   private readonly powerChar: Characteristic;
@@ -62,13 +69,13 @@ export default class LightBulbAccessory {
 
     this.powerChar = this.service
       .getCharacteristic(this.platform.Characteristic.On)
-      .onGet(this.handleOnGet.bind(this))
-      .onSet(this.handleOnSet.bind(this));
+      .onGet(On.get.bind(this))
+      .onSet(On.set.bind(this));
 
     this.service
       .getCharacteristic(this.platform.Characteristic.Brightness)
-      .onGet(this.handleBrightnessGet.bind(this))
-      .onSet(this.handleBrightnessSet.bind(this));
+      .onGet(Brightness.get.bind(this))
+      .onSet(Brightness.set.bind(this));
 
     this.service
       .getCharacteristic(this.platform.Characteristic.ColorTemperature)
@@ -76,70 +83,26 @@ export default class LightBulbAccessory {
         minValue: HOME_KIT_VALUES.min,
         maxValue: HOME_KIT_VALUES.max
       })
-      .onGet(this.handleColorTemperatureGet.bind(this))
-      .onSet(this.handleColorTemperatureSet.bind(this));
+      .onGet(ColorTemperature.get.bind(this))
+      .onSet(ColorTemperature.set.bind(this));
 
     this.service
       .getCharacteristic(this.platform.Characteristic.Hue)
-      .onGet(this.handleHueGet.bind(this))
-      .onSet(this.handleHueSet.bind(this));
+      .onGet(Hue.get.bind(this))
+      .onSet(Hue.set.bind(this));
 
     this.service
       .getCharacteristic(this.platform.Characteristic.Saturation)
-      .onGet(this.handleSaturationGet.bind(this))
-      .onSet(this.handleSaturationSet.bind(this));
-  }
+      .onGet(Saturation.get.bind(this))
+      .onSet(Saturation.set.bind(this));
 
-  private async handleOnGet() {
-    const deviceInfo = await this.tpLink.getInfo();
-    return deviceInfo.device_on || false;
-  }
+    const adaptiveLightingController =
+      new this.platform.api.hap.AdaptiveLightingController(this.service, {
+        controllerMode:
+          this.platform.api.hap.AdaptiveLightingControllerMode.AUTOMATIC
+      });
 
-  private async handleOnSet(value: CharacteristicValue) {
-    await this.tpLink.sendCommand('power', value as boolean);
-  }
-
-  private async handleBrightnessGet() {
-    const deviceInfo = await this.tpLink.getInfo();
-    return deviceInfo.brightness || 100;
-  }
-
-  private async handleBrightnessSet(value: CharacteristicValue) {
-    await this.tpLink.sendCommand('brightness', parseInt(value.toString()));
-  }
-
-  private async handleColorTemperatureGet() {
-    const deviceInfo = await this.tpLink.getInfo();
-    return toHomeKitValues(deviceInfo.color_temp || TP_LINK_VALUES.min);
-  }
-
-  private async handleColorTemperatureSet(value: CharacteristicValue) {
-    const update = await this.tpLink.sendCommand(
-      'colorTemp',
-      toTPLinkValues(parseInt(value.toString()))
-    );
-
-    if (update) {
-      this.powerChar.updateValue(true);
-    }
-  }
-
-  private async handleHueGet() {
-    const deviceInfo = await this.tpLink.getInfo();
-    return deviceInfo.hue || 0;
-  }
-
-  private async handleHueSet(value: CharacteristicValue) {
-    this.hue = parseInt(value.toString());
-  }
-
-  private async handleSaturationGet() {
-    const deviceInfo = await this.tpLink.getInfo();
-    return deviceInfo.saturation || 0;
-  }
-
-  private async handleSaturationSet(value: CharacteristicValue) {
-    this.saturation = parseInt(value.toString());
+    this.accessory.configureController(adaptiveLightingController);
   }
 
   private async updateHueAndSat() {
@@ -148,11 +111,7 @@ export default class LightBulbAccessory {
       const s = parseInt(this._saturation.toString());
       this._hue = undefined;
       this._saturation = undefined;
-      const update = await this.tpLink.sendCommand('hueAndSaturation', h, s);
-
-      if (update) {
-        this.powerChar.updateValue(true);
-      }
+      await this.tpLink.sendCommand('hueAndSaturation', h, s);
     }
   }
 }
