@@ -30,8 +30,11 @@ export default class TPLink {
   private publicKey?: string;
   private classSetup = false;
 
-  private loginToken?: string;
   private tryResendCommand = false;
+  private loginToken?: string;
+
+  private _prevPowerState = false;
+  private _unsentData: any = {};
 
   private infoCache?: {
     data: DeviceInfo;
@@ -74,6 +77,7 @@ export default class TPLink {
         setAt: Date.now()
       };
 
+      this._prevPowerState = deviceInfo.device_on ?? false;
       return deviceInfo;
     });
   }
@@ -85,14 +89,19 @@ export default class TPLink {
     return this.lock.acquire(
       'send-command',
       (): Promise<CommandReturnType<T>> => {
-        return this.sendCommandWithNoLock(command, ...args);
+        if (command === 'power') {
+          this._prevPowerState = args[0] as boolean;
+        }
+
+        return this.sendCommandWithNoLock(command, args, this._prevPowerState);
       }
     );
   }
 
   private async sendCommandWithNoLock<T extends Command>(
     command: T,
-    ...args: Parameters<Commands[T]>
+    args: Parameters<Commands[T]>,
+    isDeviceOn = false
   ): Promise<CommandReturnType<T>> {
     if (!commands[command.toString()]) {
       return false as CommandReturnType<T>;
@@ -107,10 +116,43 @@ export default class TPLink {
     }
 
     const { __method__, ...params } = commands[command.toString()](...args);
+    const validMethod = __method__ ?? 'set_device_info';
+
+    if (!isDeviceOn && validMethod === 'set_device_info') {
+      const paramsToCache = { ...params };
+      delete paramsToCache.device_on;
+
+      if (command === 'colorTemp') {
+        delete this._unsentData.saturation;
+        delete this._unsentData.hue;
+      }
+
+      this._unsentData = {
+        ...this._unsentData,
+        ...paramsToCache
+      };
+
+      if (command !== 'power') {
+        this.tryResendCommand = false;
+        return true as CommandReturnType<T>;
+      }
+    }
+
+    const extraData =
+      isDeviceOn && validMethod === 'set_device_info'
+        ? { ...this._unsentData }
+        : {};
+
+    if (isDeviceOn) {
+      this._unsentData = {};
+    }
 
     const { body } = await this.sendSecureRequest(
-      __method__ ?? 'set_device_info',
-      params,
+      validMethod,
+      {
+        ...extraData,
+        ...params
+      },
       true
     );
 
@@ -118,7 +160,7 @@ export default class TPLink {
       if (!this.tryResendCommand && `${body.error_code}` === '9999') {
         this.tryResendCommand = true;
         this.log.info('Session expired');
-        return this.sendCommandWithNoLock(command, ...args);
+        return this.sendCommandWithNoLock(command, args, isDeviceOn);
       }
 
       this.log.error('Command error:', command, '>', body.error_code);
