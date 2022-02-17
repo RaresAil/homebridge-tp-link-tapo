@@ -86,6 +86,9 @@ export default class TPLink {
     command: T,
     ...args: Parameters<Commands[T]>
   ): Promise<CommandReturnType<T>> {
+    if (command === 'power' && this._prevPowerState == args[0]) {
+      return
+    }
     return this.lock.acquire(
       'send-command',
       (): Promise<CommandReturnType<T>> => {
