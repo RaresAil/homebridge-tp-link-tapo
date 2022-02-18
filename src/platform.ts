@@ -102,6 +102,9 @@ export default class Platform implements DynamicPlatformPlugin {
       const deviceName = Buffer.from(deviceInfo.nickname, 'base64').toString(
         'utf-8'
       );
+      const supportsColorTemp = (deviceInfo.color_temp != undefined);
+      const supportsHue = (deviceInfo.hue != undefined);
+      const supportsSaturation = (deviceInfo.saturation != undefined);
 
       const existingAccessory = this.accessories.find(
         (accessory) => accessory.UUID === uuid
@@ -123,7 +126,10 @@ export default class Platform implements DynamicPlatformPlugin {
             existingAccessory,
             this.log,
             deviceInfo.model,
-            deviceInfo.mac
+            deviceInfo.mac,
+            supportsColorTemp,
+            supportsHue,
+            supportsSaturation
           )
         );
         return;
@@ -145,7 +151,10 @@ export default class Platform implements DynamicPlatformPlugin {
           accessory,
           this.log,
           deviceInfo.model,
-          deviceInfo.mac
+          deviceInfo.mac,
+          supportsColorTemp,
+          supportsHue,
+          supportsSaturation
         )
       );
 
