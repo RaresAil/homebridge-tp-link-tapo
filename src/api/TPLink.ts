@@ -157,10 +157,18 @@ export default class TPLink {
     );
 
     if (body.error_code && body.error_code !== 0) {
-      if (!this.tryResendCommand && `${body.error_code}` === '9999') {
-        this.tryResendCommand = true;
-        this.log.info('Session expired');
-        return this.sendCommandWithNoLock(command, args, isDeviceOn);
+      if (!this.tryResendCommand) {
+        if (`${body.error_code}` === '9999') {
+          this.tryResendCommand = true;
+          this.log.info('Session expired');
+          return this.sendCommandWithNoLock(command, args, isDeviceOn);
+        }
+
+        if (`${body.error_code}` === '-1301') {
+          this.tryResendCommand = true;
+          this.log.info('Rate limit exceeded. Renewing session.');
+          return this.sendCommandWithNoLock(command, args, isDeviceOn);
+        }
       }
 
       this.log.error('Command error:', command, '>', body.error_code);
@@ -264,6 +272,10 @@ export default class TPLink {
   private needsNewHandshake() {
     if (!this.classSetup) {
       throw new Error('Execute the .setup() first!');
+    }
+
+    if (this.tryRenewHandshake) {
+      return true;
     }
 
     if (!this.tpLinkCipher) {
