@@ -44,7 +44,10 @@ export default class LightBulbAccessory {
     private readonly accessory: PlatformAccessory<Context>,
     private readonly log: Logger,
     public readonly model: string,
-    public readonly mac: string
+    public readonly mac: string,
+    public readonly supportsColorTemp: boolean,
+    public readonly supportsHue: boolean,
+    public readonly supportsSaturation: boolean
   ) {
     this.tpLink = accessory.context.tpLink;
 
@@ -71,30 +74,38 @@ export default class LightBulbAccessory {
       .onGet(Brightness.get.bind(this))
       .onSet(Brightness.set.bind(this));
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.ColorTemperature)
-      .setProps({
-        minValue: HOME_KIT_VALUES.min,
-        maxValue: HOME_KIT_VALUES.max
-      })
-      .onGet(ColorTemperature.get.bind(this))
-      .onSet(ColorTemperature.set.bind(this));
+    if (supportsColorTemp == true) {
+      this.service
+        .getCharacteristic(this.platform.Characteristic.ColorTemperature)
+        .setProps({
+          minValue: HOME_KIT_VALUES.min,
+          maxValue: HOME_KIT_VALUES.max
+        })
+        .onGet(ColorTemperature.get.bind(this))
+        .onSet(ColorTemperature.set.bind(this));
+    }
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.Hue)
-      .onGet(Hue.get.bind(this))
-      .onSet(Hue.set.bind(this));
+    if (supportsHue == true) {
+      this.service
+        .getCharacteristic(this.platform.Characteristic.Hue)
+        .onGet(Hue.get.bind(this))
+        .onSet(Hue.set.bind(this));
+    }
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.Saturation)
-      .onGet(Saturation.get.bind(this))
-      .onSet(Saturation.set.bind(this));
+    if (supportsSaturation == true) {
+      this.service
+        .getCharacteristic(this.platform.Characteristic.Saturation)
+        .onGet(Saturation.get.bind(this))
+        .onSet(Saturation.set.bind(this));
+    }
 
-    const adaptiveLightingController =
-      new this.platform.api.hap.AdaptiveLightingController(this.service, {
-        controllerMode:
-          this.platform.api.hap.AdaptiveLightingControllerMode.AUTOMATIC
-      });
+    if (supportsColorTemp == true && supportsHue == true && supportsSaturation == true) {
+      const adaptiveLightingController =
+        new this.platform.api.hap.AdaptiveLightingController(this.service, {
+          controllerMode:
+            this.platform.api.hap.AdaptiveLightingControllerMode.AUTOMATIC
+        });
+    }
 
     this.accessory.configureController(adaptiveLightingController);
   }
