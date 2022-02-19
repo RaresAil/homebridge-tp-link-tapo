@@ -17,6 +17,15 @@ export type AccessoryThisType = ThisType<{
   hue: number;
 }>;
 
+export enum LightFeature {
+  COLOR_TEMP = 'color_temp',
+  SATURATION = 'saturation',
+  HUE = 'hue'
+}
+export type LightFeatures = Partial<
+  [LightFeature.SATURATION, LightFeature.COLOR_TEMP, LightFeature.HUE]
+>;
+
 export default class LightBulbAccessory {
   private readonly powerChar: Characteristic;
   private readonly service: Service;
@@ -44,7 +53,8 @@ export default class LightBulbAccessory {
     private readonly accessory: PlatformAccessory<Context>,
     private readonly log: Logger,
     public readonly model: string,
-    public readonly mac: string
+    public readonly mac: string,
+    public readonly features: LightFeatures
   ) {
     this.tpLink = accessory.context.tpLink;
 
@@ -71,32 +81,44 @@ export default class LightBulbAccessory {
       .onGet(Brightness.get.bind(this))
       .onSet(Brightness.set.bind(this));
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.ColorTemperature)
-      .setProps({
-        minValue: HOME_KIT_VALUES.min,
-        maxValue: HOME_KIT_VALUES.max
-      })
-      .onGet(ColorTemperature.get.bind(this))
-      .onSet(ColorTemperature.set.bind(this));
+    if (this.features.includes(LightFeature.COLOR_TEMP)) {
+      this.service
+        .getCharacteristic(this.platform.Characteristic.ColorTemperature)
+        .setProps({
+          minValue: HOME_KIT_VALUES.min,
+          maxValue: HOME_KIT_VALUES.max
+        })
+        .onGet(ColorTemperature.get.bind(this))
+        .onSet(ColorTemperature.set.bind(this));
+    }
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.Hue)
-      .onGet(Hue.get.bind(this))
-      .onSet(Hue.set.bind(this));
+    if (this.features.includes(LightFeature.HUE)) {
+      this.service
+        .getCharacteristic(this.platform.Characteristic.Hue)
+        .onGet(Hue.get.bind(this))
+        .onSet(Hue.set.bind(this));
+    }
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.Saturation)
-      .onGet(Saturation.get.bind(this))
-      .onSet(Saturation.set.bind(this));
+    if (this.features.includes(LightFeature.SATURATION)) {
+      this.service
+        .getCharacteristic(this.platform.Characteristic.Saturation)
+        .onGet(Saturation.get.bind(this))
+        .onSet(Saturation.set.bind(this));
+    }
 
-    const adaptiveLightingController =
-      new this.platform.api.hap.AdaptiveLightingController(this.service, {
-        controllerMode:
-          this.platform.api.hap.AdaptiveLightingControllerMode.AUTOMATIC
-      });
+    if (
+      this.features.includes(LightFeature.COLOR_TEMP) &&
+      this.features.includes(LightFeature.SATURATION) &&
+      this.features.includes(LightFeature.HUE)
+    ) {
+      const adaptiveLightingController =
+        new this.platform.api.hap.AdaptiveLightingController(this.service, {
+          controllerMode:
+            this.platform.api.hap.AdaptiveLightingControllerMode.AUTOMATIC
+        });
 
-    this.accessory.configureController(adaptiveLightingController);
+      this.accessory.configureController(adaptiveLightingController);
+    }
   }
 
   private async updateHueAndSat() {

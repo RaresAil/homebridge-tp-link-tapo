@@ -8,8 +8,11 @@ import {
   Characteristic
 } from 'homebridge';
 
+import LightBulbAccessory, {
+  LightFeature,
+  LightFeatures
+} from './LightBulbAccessory';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import LightBulbAccessory from './LightBulbAccessory';
 import Context from './@types/Context';
 import TPLink from './api/TPLink';
 import delay from './utils/delay';
@@ -107,6 +110,19 @@ export default class Platform implements DynamicPlatformPlugin {
         (accessory) => accessory.UUID === uuid
       );
 
+      const lightFeatures: LightFeatures = [];
+      if (deviceInfo.color_temp !== undefined) {
+        lightFeatures.push(LightFeature.COLOR_TEMP);
+      }
+
+      if (deviceInfo.hue !== undefined) {
+        lightFeatures.push(LightFeature.HUE);
+      }
+
+      if (deviceInfo.saturation !== undefined) {
+        lightFeatures.push(LightFeature.SATURATION);
+      }
+
       if (existingAccessory) {
         this.log.info(
           'Restoring existing accessory from cache:',
@@ -123,7 +139,8 @@ export default class Platform implements DynamicPlatformPlugin {
             existingAccessory,
             this.log,
             deviceInfo.model,
-            deviceInfo.mac
+            deviceInfo.mac,
+            lightFeatures
           )
         );
         return;
@@ -145,7 +162,8 @@ export default class Platform implements DynamicPlatformPlugin {
           accessory,
           this.log,
           deviceInfo.model,
-          deviceInfo.mac
+          deviceInfo.mac,
+          lightFeatures
         )
       );
 

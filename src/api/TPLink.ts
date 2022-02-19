@@ -90,6 +90,12 @@ export default class TPLink {
       'send-command',
       (): Promise<CommandReturnType<T>> => {
         if (command === 'power') {
+          if (args[0] === this._prevPowerState) {
+            return this._prevPowerState as unknown as Promise<
+              CommandReturnType<T>
+            >;
+          }
+
           this._prevPowerState = args[0] as boolean;
         }
 
@@ -272,10 +278,6 @@ export default class TPLink {
   private needsNewHandshake() {
     if (!this.classSetup) {
       throw new Error('Execute the .setup() first!');
-    }
-
-    if (this.tryRenewHandshake) {
-      return true;
     }
 
     if (!this.tpLinkCipher) {
