@@ -1,16 +1,16 @@
 {
   "private": false,
-  "displayName": "TPLink Smart Lights",
-  "name": "homebridge-tplink-smart-light",
+  "displayName": "TPLink Tapo",
+  "name": "homebridge-tp-link-tapo",
   "version": "2.0.2",
-  "description": "A platform to implement the tplink light bulbs with Adaptive Lighting",
+  "description": "A platform to implement the tp-link tapo device and Adaptive Lighting for light bulbs",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git://github.com/RaresAil/homebridge-tplink-smart-light.git"
+    "url": "git://github.com/RaresAil/homebridge-tp-link-tapo.git"
   },
   "bugs": {
-    "url": "https://github.com/RaresAil/homebridge-tplink-smart-light/issues"
+    "url": "https://github.com/RaresAil/homebridge-tp-link-tapo/issues"
   },
   "engines": {
     "homebridge": ">=1.3.9",
@@ -29,12 +29,15 @@
     "homebridge-plugin",
     "Adaptive Lighting",
     "tplink",
+    "tp-link",
+    "tp",
+    "link",
     "light",
     "bulb",
     "adaptive",
     "lighting",
     "tapo",
-    "tplink-smart-light"
+    "smart"
   ],
   "dependencies": {
     "async-lock": "^1.3.0",

@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "HomebridgeTPLinkLights",
+  "pluginAlias": "HomebridgeTPLinkTapo",
   "pluginType": "platform",
   "singular": true,
   "schema": {
@@ -9,7 +9,7 @@
         "title": "Name",
         "type": "string",
         "required": true,
-        "description": "TPLink Light Bulbs"
+        "description": "TPLink Tapo Platform"
       },
       "email": {
         "title": "Email",
@@ -28,7 +28,7 @@
         "required": true,
         "uniqueItems": true,
         "type": "array",
-        "description": "A list of IPs for each light bulb",
+        "description": "A list of IPs for each device",
         "items": {
           "title": "Ip Address",
           "type": "string"

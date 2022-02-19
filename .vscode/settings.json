@@ -22,5 +22,6 @@
         "@typescript-eslint/no-explicit-any": "off"
       }
     }
-  }
+  },
+  "cSpell.words": ["Tapo"]
 }
