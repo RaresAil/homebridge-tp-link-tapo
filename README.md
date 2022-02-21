@@ -1,5 +1,7 @@
 # Homebridge TP-Link Tapo
 
+[![Discord](https://img.shields.io/discord/942035865658613790.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/CAvGGvRGB3)
+
 We recommend to use the platform as a Child Bridge for the best performance.
 
 Most of the time the response time between the app and the device is 80ms.
