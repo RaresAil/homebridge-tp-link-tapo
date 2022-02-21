@@ -90,6 +90,12 @@ export default class TPLink {
       'send-command',
       (): Promise<CommandReturnType<T>> => {
         if (command === 'power') {
+          if (args[0] === this._prevPowerState) {
+            return this._prevPowerState as unknown as Promise<
+              CommandReturnType<T>
+            >;
+          }
+
           this._prevPowerState = args[0] as boolean;
         }
 
@@ -157,10 +163,18 @@ export default class TPLink {
     );
 
     if (body.error_code && body.error_code !== 0) {
-      if (!this.tryResendCommand && `${body.error_code}` === '9999') {
-        this.tryResendCommand = true;
-        this.log.info('Session expired');
-        return this.sendCommandWithNoLock(command, args, isDeviceOn);
+      if (!this.tryResendCommand) {
+        if (`${body.error_code}` === '9999') {
+          this.tryResendCommand = true;
+          this.log.info('Session expired');
+          return this.sendCommandWithNoLock(command, args, isDeviceOn);
+        }
+
+        if (`${body.error_code}` === '-1301') {
+          this.tryResendCommand = true;
+          this.log.info('Rate limit exceeded. Renewing session.');
+          return this.sendCommandWithNoLock(command, args, isDeviceOn);
+        }
       }
 
       this.log.error('Command error:', command, '>', body.error_code);

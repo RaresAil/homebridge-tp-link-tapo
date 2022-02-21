@@ -44,7 +44,8 @@ export default class LightBulbAccessory {
     private readonly accessory: PlatformAccessory<Context>,
     private readonly log: Logger,
     public readonly model: string,
-    public readonly mac: string
+    public readonly mac: string,
+    public readonly hasColors: boolean
   ) {
     this.tpLink = accessory.context.tpLink;
 
@@ -71,32 +72,34 @@ export default class LightBulbAccessory {
       .onGet(Brightness.get.bind(this))
       .onSet(Brightness.set.bind(this));
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.ColorTemperature)
-      .setProps({
-        minValue: HOME_KIT_VALUES.min,
-        maxValue: HOME_KIT_VALUES.max
-      })
-      .onGet(ColorTemperature.get.bind(this))
-      .onSet(ColorTemperature.set.bind(this));
+    if (this.hasColors) {
+      this.service
+        .getCharacteristic(this.platform.Characteristic.ColorTemperature)
+        .setProps({
+          minValue: HOME_KIT_VALUES.min,
+          maxValue: HOME_KIT_VALUES.max
+        })
+        .onGet(ColorTemperature.get.bind(this))
+        .onSet(ColorTemperature.set.bind(this));
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.Hue)
-      .onGet(Hue.get.bind(this))
-      .onSet(Hue.set.bind(this));
+      this.service
+        .getCharacteristic(this.platform.Characteristic.Hue)
+        .onGet(Hue.get.bind(this))
+        .onSet(Hue.set.bind(this));
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.Saturation)
-      .onGet(Saturation.get.bind(this))
-      .onSet(Saturation.set.bind(this));
+      this.service
+        .getCharacteristic(this.platform.Characteristic.Saturation)
+        .onGet(Saturation.get.bind(this))
+        .onSet(Saturation.set.bind(this));
 
-    const adaptiveLightingController =
-      new this.platform.api.hap.AdaptiveLightingController(this.service, {
-        controllerMode:
-          this.platform.api.hap.AdaptiveLightingControllerMode.AUTOMATIC
-      });
+      const adaptiveLightingController =
+        new this.platform.api.hap.AdaptiveLightingController(this.service, {
+          controllerMode:
+            this.platform.api.hap.AdaptiveLightingControllerMode.AUTOMATIC
+        });
 
-    this.accessory.configureController(adaptiveLightingController);
+      this.accessory.configureController(adaptiveLightingController);
+    }
   }
 
   private async updateHueAndSat() {
