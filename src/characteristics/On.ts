@@ -16,7 +16,11 @@ const characteristic: {
     return deviceInfo.device_on || false;
   },
   set: async function (value: CharacteristicValue) {
-    await this.tpLink.sendCommand('power', value as boolean);
+    try {
+      await this.tpLink.sendCommand('power', value as boolean);
+    } catch (err: any) {
+      this.log.error('Failed to set power:', this.mac, '|', err.message);
+    }
   }
 };
 

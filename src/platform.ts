@@ -46,30 +46,34 @@ export default class Platform implements DynamicPlatformPlugin {
   }
 
   private async discoverDevices() {
-    const { email, password, addresses } = this.config ?? {};
-    if (
-      !email ||
-      !password ||
-      !addresses ||
-      !Array.isArray(addresses) ||
-      addresses.length <= 0
-    ) {
-      if (this.accessories.length > 0) {
-        this.api.unregisterPlatformAccessories(
-          PLUGIN_NAME,
-          PLATFORM_NAME,
-          this.accessories
-        );
+    try {
+      const { email, password, addresses } = this.config ?? {};
+      if (
+        !email ||
+        !password ||
+        !addresses ||
+        !Array.isArray(addresses) ||
+        addresses.length <= 0
+      ) {
+        if (this.accessories.length > 0) {
+          this.api.unregisterPlatformAccessories(
+            PLUGIN_NAME,
+            PLATFORM_NAME,
+            this.accessories
+          );
+        }
+
+        return;
       }
 
-      return;
+      await Promise.all(
+        addresses.map((address) => this.loadDevice(address, email, password))
+      );
+
+      this.checkOldDevices();
+    } catch (err: any) {
+      this.log.error('Failed to discover devices:', err.message);
     }
-
-    await Promise.all(
-      addresses.map((address) => this.loadDevice(address, email, password))
-    );
-
-    this.checkOldDevices();
   }
 
   private async loadDevice(ip: string, email: string, password: string) {
