@@ -54,14 +54,19 @@ export default class TPLink {
   }
 
   public async setup(): Promise<TPLink> {
-    if (this.classSetup) {
-      return this;
+    try {
+      if (this.classSetup) {
+        return this;
+      }
+
+      const keys = await TpLinkCipher.createKeyPair();
+      this.publicKey = keys.public;
+      this.privateKey = keys.private;
+      this.classSetup = true;
+    } catch (e) {
+      this.log.error('Error setting up TPLink class:', e);
     }
 
-    const keys = await TpLinkCipher.createKeyPair();
-    this.publicKey = keys.public;
-    this.privateKey = keys.private;
-    this.classSetup = true;
     return this;
   }
 
@@ -71,7 +76,7 @@ export default class TPLink {
         return this.infoCache.data;
       }
 
-      const deviceInfo = await this.sendCommand('deviceInfo');
+      const deviceInfo = (await this.sendCommand('deviceInfo')) ?? {};
       this.infoCache = {
         data: deviceInfo,
         setAt: Date.now()
@@ -109,79 +114,89 @@ export default class TPLink {
     args: Parameters<Commands[T]>,
     isDeviceOn = false
   ): Promise<CommandReturnType<T>> {
-    if (!commands[command.toString()]) {
-      return false as CommandReturnType<T>;
-    }
-
-    if (!this.loginToken || this.needsNewHandshake() || this.tryResendCommand) {
-      if (this.tryResendCommand) {
-        this.log.info('Trying to login again.');
+    try {
+      if (!commands[command.toString()]) {
+        return false as CommandReturnType<T>;
       }
 
-      await this.login();
-    }
-
-    const { __method__, ...params } = commands[command.toString()](...args);
-    const validMethod = __method__ ?? 'set_device_info';
-
-    if (!isDeviceOn && validMethod === 'set_device_info') {
-      const paramsToCache = { ...params };
-      delete paramsToCache.device_on;
-
-      if (command === 'colorTemp') {
-        delete this._unsentData.saturation;
-        delete this._unsentData.hue;
-      }
-
-      this._unsentData = {
-        ...this._unsentData,
-        ...paramsToCache
-      };
-
-      if (command !== 'power') {
-        this.tryResendCommand = false;
-        return true as CommandReturnType<T>;
-      }
-    }
-
-    const extraData =
-      isDeviceOn && validMethod === 'set_device_info'
-        ? { ...this._unsentData }
-        : {};
-
-    if (isDeviceOn) {
-      this._unsentData = {};
-    }
-
-    const { body } = await this.sendSecureRequest(
-      validMethod,
-      {
-        ...extraData,
-        ...params
-      },
-      true
-    );
-
-    if (body.error_code && body.error_code !== 0) {
-      if (!this.tryResendCommand) {
-        if (`${body.error_code}` === '9999') {
-          this.tryResendCommand = true;
-          this.log.info('Session expired');
-          return this.sendCommandWithNoLock(command, args, isDeviceOn);
+      if (
+        !this.loginToken ||
+        this.needsNewHandshake() ||
+        this.tryResendCommand
+      ) {
+        if (this.tryResendCommand) {
+          this.log.info('Trying to login again.');
         }
 
-        if (`${body.error_code}` === '-1301') {
-          this.tryResendCommand = true;
-          this.log.info('Rate limit exceeded. Renewing session.');
-          return this.sendCommandWithNoLock(command, args, isDeviceOn);
+        await this.login();
+      }
+
+      const { __method__, ...params } = commands[command.toString()](...args);
+      const validMethod = __method__ ?? 'set_device_info';
+
+      if (!isDeviceOn && validMethod === 'set_device_info') {
+        const paramsToCache = { ...params };
+        delete paramsToCache.device_on;
+
+        if (command === 'colorTemp') {
+          delete this._unsentData.saturation;
+          delete this._unsentData.hue;
+        }
+
+        this._unsentData = {
+          ...this._unsentData,
+          ...paramsToCache
+        };
+
+        if (command !== 'power') {
+          this.tryResendCommand = false;
+          return true as CommandReturnType<T>;
         }
       }
 
-      this.log.error('Command error:', command, '>', body.error_code);
-    }
+      const extraData =
+        isDeviceOn && validMethod === 'set_device_info'
+          ? { ...this._unsentData }
+          : {};
 
-    this.tryResendCommand = false;
-    return (body?.result ?? body?.error_code === 0) as CommandReturnType<T>;
+      if (isDeviceOn) {
+        this._unsentData = {};
+      }
+
+      const { body } = await this.sendSecureRequest(
+        validMethod,
+        {
+          ...extraData,
+          ...params
+        },
+        true
+      );
+
+      if (body.error_code && body.error_code !== 0) {
+        if (!this.tryResendCommand) {
+          if (`${body.error_code}` === '9999') {
+            this.tryResendCommand = true;
+            this.log.info('Session expired');
+            return this.sendCommandWithNoLock(command, args, isDeviceOn);
+          }
+
+          if (`${body.error_code}` === '-1301') {
+            this.tryResendCommand = true;
+            this.log.info('Rate limit exceeded. Renewing session.');
+            return this.sendCommandWithNoLock(command, args, isDeviceOn);
+          }
+        }
+
+        this.log.error('Command error:', command, '>', body.error_code);
+      }
+
+      this.tryResendCommand = false;
+      return (body?.result ?? body?.error_code === 0) as CommandReturnType<T>;
+    } catch (e: any) {
+      this.log.error('Error sending command:', command, e);
+      this.tryResendCommand = false;
+      return null as CommandReturnType<T>;
+    }
   }
 
   private async login() {

@@ -16,7 +16,11 @@ const characteristic: {
     return deviceInfo.brightness || 100;
   },
   set: async function (value: CharacteristicValue) {
-    await this.tpLink.sendCommand('brightness', parseInt(value.toString()));
+    try {
+      await this.tpLink.sendCommand('brightness', parseInt(value.toString()));
+    } catch (err: any) {
+      this.log.error('Failed to set brightness:', this.mac, '|', err.message);
+    }
   }
 };
 

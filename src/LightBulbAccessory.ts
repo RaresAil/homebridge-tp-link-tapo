@@ -12,6 +12,8 @@ import Platform from './platform';
 
 export type AccessoryThisType = ThisType<{
   readonly powerChar: Characteristic;
+  readonly log: Logger;
+  readonly mac: string;
   saturation: number;
   tpLink: TPLink;
   hue: number;
@@ -103,12 +105,21 @@ export default class LightBulbAccessory {
   }
 
   private async updateHueAndSat() {
-    if (this._hue !== undefined && this._saturation !== undefined) {
-      const h = parseInt(this._hue.toString());
-      const s = parseInt(this._saturation.toString());
-      this._hue = undefined;
-      this._saturation = undefined;
-      await this.tpLink.sendCommand('hueAndSaturation', h, s);
+    try {
+      if (this._hue !== undefined && this._saturation !== undefined) {
+        const h = parseInt(this._hue.toString());
+        const s = parseInt(this._saturation.toString());
+        this._hue = undefined;
+        this._saturation = undefined;
+        await this.tpLink.sendCommand('hueAndSaturation', h, s);
+      }
+    } catch (err: any) {
+      this.log.error(
+        'Failed to update hue and saturation:',
+        this.mac,
+        '|',
+        err.message
+      );
     }
   }
 }
