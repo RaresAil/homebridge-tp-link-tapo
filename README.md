@@ -5,6 +5,7 @@
 [![Build and Lint](https://github.com/RaresAil/homebridge-tp-link-tapo/actions/workflows/build.yml/badge.svg)](https://github.com/RaresAil/homebridge-tp-link-tapo/actions/workflows/build.yml)
 [![CodeQL](https://github.com/RaresAil/homebridge-tp-link-tapo/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/RaresAil/homebridge-tp-link-tapo/actions/workflows/codeql-analysis.yml)
 
+[![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
 ![Snyk Vulnerabilities for npm package](https://img.shields.io/snyk/vulnerabilities/npm/homebridge-tp-link-tapo)
 ![npm](https://img.shields.io/npm/dm/homebridge-tp-link-tapo)
 
