@@ -2,12 +2,16 @@
   "private": false,
   "displayName": "TPLink Tapo",
   "name": "homebridge-tp-link-tapo",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "A platform to implement the tp-link tapo device and Adaptive Lighting for light bulbs",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git://github.com/RaresAil/homebridge-tp-link-tapo.git"
+  },
+  "funding": {
+    "url": "https://www.paypal.com/donate/?hosted_button_id=5GM8SZ2YNVK5Q",
+    "type": "paypal"
   },
   "bugs": {
     "url": "https://github.com/RaresAil/homebridge-tp-link-tapo/issues"
