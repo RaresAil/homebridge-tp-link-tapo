@@ -5,7 +5,7 @@ import {
   Nullable
 } from 'homebridge';
 
-import { AccessoryThisType } from '../LightBulbAccessory';
+import { AccessoryThisType } from '..';
 
 const characteristic: {
   get: CharacteristicGetHandler;
