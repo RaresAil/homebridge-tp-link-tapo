@@ -5,7 +5,7 @@ import {
   Nullable
 } from 'homebridge';
 
-import { AccessoryThisType } from '../LightBulbAccessory';
+import { AccessoryThisType } from '..';
 
 const characteristic: {
   get: CharacteristicGetHandler;
@@ -13,10 +13,10 @@ const characteristic: {
 } & AccessoryThisType = {
   get: async function (): Promise<Nullable<CharacteristicValue>> {
     const deviceInfo = await this.tpLink.getInfo();
-    return deviceInfo.hue || 0;
+    return deviceInfo.saturation || 0;
   },
   set: async function (value: CharacteristicValue) {
-    this.hue = parseInt(value.toString());
+    this.saturation = parseInt(value.toString());
   }
 };
 

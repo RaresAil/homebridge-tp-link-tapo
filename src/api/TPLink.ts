@@ -1,7 +1,6 @@
 import AsyncLock from 'async-lock';
 import crypto from 'crypto';
 import axios from 'axios';
-import { v4 } from 'uuid';
 
 import DeviceInfo from './@types/DeviceInfo';
 import TpLinkCipher from './TpLinkCipher';
@@ -49,7 +48,7 @@ export default class TPLink {
   ) {
     this.email = TpLinkCipher.toBase64(TpLinkCipher.encodeUsername(this.email));
     this.password = TpLinkCipher.toBase64(this.password);
-    this.terminalUUID = v4();
+    this.terminalUUID = crypto.randomUUID();
     this.lock = new AsyncLock();
   }
 

@@ -1,14 +1,17 @@
 import { PlatformAccessory, Characteristic, Service, Logger } from 'homebridge';
 
 import ColorTemperature from './characteristics/ColorTemperature';
-import { HOME_KIT_VALUES } from './utils/translateColorTemp';
 import Brightness from './characteristics/Brightness';
 import Saturation from './characteristics/Saturation';
 import Hue from './characteristics/Hue';
-import Context from './@types/Context';
 import On from './characteristics/On';
-import TPLink from './api/TPLink';
-import Platform from './platform';
+
+import { HOME_KIT_VALUES } from '../../utils/translateColorTemp';
+import DeviceInfo from '../../api/@types/DeviceInfo';
+import Accessory from '../../@types/Accessory';
+import Context from '../../@types/Context';
+import TPLink from '../../api/TPLink';
+import Platform from '../../platform';
 
 export type AccessoryThisType = ThisType<{
   readonly powerChar: Characteristic;
@@ -19,10 +22,9 @@ export type AccessoryThisType = ThisType<{
   hue: number;
 }>;
 
-export default class LightBulbAccessory {
+export default class LightBulbAccessory extends Accessory {
   private readonly powerChar: Characteristic;
   private readonly service: Service;
-  private readonly tpLink: TPLink;
 
   private _hue?: number;
   private _saturation?: number;
@@ -42,14 +44,26 @@ export default class LightBulbAccessory {
   }
 
   constructor(
-    private readonly platform: Platform,
-    private readonly accessory: PlatformAccessory<Context>,
-    private readonly log: Logger,
-    public readonly model: string,
-    public readonly mac: string,
-    public readonly hasColors: boolean
+    platform: Platform,
+    accessory: PlatformAccessory<Context>,
+    log: Logger,
+    deviceInfo: DeviceInfo
   ) {
-    this.tpLink = accessory.context.tpLink;
+    super(platform, accessory, log, deviceInfo);
+
+    let hasBrightness = false;
+    let hasColors = false;
+    if (
+      deviceInfo.color_temp !== undefined ||
+      deviceInfo.saturation !== undefined ||
+      deviceInfo.hue !== undefined
+    ) {
+      hasColors = true;
+    }
+
+    if (deviceInfo.brightness !== undefined) {
+      hasBrightness = true;
+    }
 
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
@@ -57,8 +71,8 @@ export default class LightBulbAccessory {
         this.platform.Characteristic.Manufacturer,
         'TP-Link Technologies'
       )
-      .setCharacteristic(this.platform.Characteristic.Model, model)
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, mac);
+      .setCharacteristic(this.platform.Characteristic.Model, this.model)
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.mac);
 
     this.service =
       this.accessory.getService(this.platform.Service.Lightbulb) ||
@@ -69,12 +83,14 @@ export default class LightBulbAccessory {
       .onGet(On.get.bind(this))
       .onSet(On.set.bind(this));
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.Brightness)
-      .onGet(Brightness.get.bind(this))
-      .onSet(Brightness.set.bind(this));
+    if (hasBrightness) {
+      this.service
+        .getCharacteristic(this.platform.Characteristic.Brightness)
+        .onGet(Brightness.get.bind(this))
+        .onSet(Brightness.set.bind(this));
+    }
 
-    if (this.hasColors) {
+    if (hasColors) {
       this.service
         .getCharacteristic(this.platform.Characteristic.ColorTemperature)
         .setProps({

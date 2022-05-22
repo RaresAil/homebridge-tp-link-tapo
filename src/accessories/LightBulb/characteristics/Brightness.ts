@@ -5,7 +5,7 @@ import {
   Nullable
 } from 'homebridge';
 
-import { AccessoryThisType } from '../LightBulbAccessory';
+import { AccessoryThisType } from '..';
 
 const characteristic: {
   get: CharacteristicGetHandler;
@@ -13,10 +13,14 @@ const characteristic: {
 } & AccessoryThisType = {
   get: async function (): Promise<Nullable<CharacteristicValue>> {
     const deviceInfo = await this.tpLink.getInfo();
-    return deviceInfo.saturation || 0;
+    return deviceInfo.brightness || 100;
   },
   set: async function (value: CharacteristicValue) {
-    this.saturation = parseInt(value.toString());
+    try {
+      await this.tpLink.sendCommand('brightness', parseInt(value.toString()));
+    } catch (err: any) {
+      this.log.error('Failed to set brightness:', this.mac, '|', err.message);
+    }
   }
 };
 

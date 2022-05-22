@@ -8,8 +8,10 @@ import {
   Characteristic
 } from 'homebridge';
 
-import LightBulbAccessory from './LightBulbAccessory';
+import Accessory, { AccessoryType } from './@types/Accessory';
+import LightBulbAccessory from './accessories/LightBulb';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
+import DeviceInfo from './api/@types/DeviceInfo';
 import Context from './@types/Context';
 import TPLink from './api/TPLink';
 import delay from './utils/delay';
@@ -22,7 +24,7 @@ export default class Platform implements DynamicPlatformPlugin {
     this.api.hap.Characteristic;
 
   public readonly accessories: PlatformAccessory<Context>[] = [];
-  public readonly registeredDevices: LightBulbAccessory[] = [];
+  public readonly registeredDevices: Accessory[] = [];
   private readonly deviceRetry: {
     [key: string]: number;
   } = {};
@@ -111,15 +113,6 @@ export default class Platform implements DynamicPlatformPlugin {
         (accessory) => accessory.UUID === uuid
       );
 
-      let hasColors = false;
-      if (
-        deviceInfo.color_temp !== undefined ||
-        deviceInfo.saturation !== undefined ||
-        deviceInfo.hue !== undefined
-      ) {
-        hasColors = true;
-      }
-
       if (existingAccessory) {
         this.log.info(
           'Restoring existing accessory from cache:',
@@ -130,16 +123,20 @@ export default class Platform implements DynamicPlatformPlugin {
           tpLink
         };
 
-        this.registeredDevices.push(
-          new LightBulbAccessory(
-            this,
-            existingAccessory,
-            this.log,
-            deviceInfo.model,
-            deviceInfo.mac,
-            hasColors
-          )
+        const registeredAccessory = this.registerAccessory(
+          existingAccessory,
+          deviceInfo
         );
+        if (!registeredAccessory) {
+          this.log.error(
+            'Failed to register accessory "%s" of type "%s"',
+            deviceName,
+            Accessory.GetType(deviceInfo)
+          );
+          return;
+        }
+
+        this.registeredDevices.push(registeredAccessory);
         return;
       }
 
@@ -153,16 +150,17 @@ export default class Platform implements DynamicPlatformPlugin {
         tpLink
       };
 
-      this.registeredDevices.push(
-        new LightBulbAccessory(
-          this,
-          accessory,
-          this.log,
-          deviceInfo.model,
-          deviceInfo.mac,
-          hasColors
-        )
-      );
+      const registeredAccessory = this.registerAccessory(accessory, deviceInfo);
+      if (!registeredAccessory) {
+        this.log.error(
+          'Failed to register accessory "%s" of type "%s"',
+          deviceName,
+          Accessory.GetType(deviceInfo)
+        );
+        return;
+      }
+
+      this.registeredDevices.push(registeredAccessory);
 
       return this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
         accessory
@@ -187,5 +185,21 @@ export default class Platform implements DynamicPlatformPlugin {
         ]);
       }
     });
+  }
+
+  private readonly accessoryClasses = {
+    [AccessoryType.LightBulb]: LightBulbAccessory
+  };
+
+  private registerAccessory(
+    accessory: PlatformAccessory<Context>,
+    deviceInfo: DeviceInfo
+  ): Accessory | null {
+    const AccessoryClass = this.accessoryClasses[Accessory.GetType(deviceInfo)];
+    if (!AccessoryClass) {
+      return null;
+    }
+
+    return new AccessoryClass(this, accessory, this.log, deviceInfo);
   }
 }
