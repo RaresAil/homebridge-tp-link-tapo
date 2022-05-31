@@ -129,9 +129,10 @@ export default class Platform implements DynamicPlatformPlugin {
         );
         if (!registeredAccessory) {
           this.log.error(
-            'Failed to register accessory "%s" of type "%s"',
+            'Failed to register accessory "%s" of type "%s" (%s)',
             deviceName,
-            Accessory.GetType(deviceInfo)
+            Accessory.GetType(deviceInfo),
+            deviceInfo?.type
           );
           return;
         }
@@ -153,9 +154,10 @@ export default class Platform implements DynamicPlatformPlugin {
       const registeredAccessory = this.registerAccessory(accessory, deviceInfo);
       if (!registeredAccessory) {
         this.log.error(
-          'Failed to register accessory "%s" of type "%s"',
+          'Failed to register accessory "%s" of type "%s" (%s)',
           deviceName,
-          Accessory.GetType(deviceInfo)
+          Accessory.GetType(deviceInfo),
+          deviceInfo?.type
         );
         return;
       }
