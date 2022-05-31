@@ -22,8 +22,11 @@ Package was renamed from `homebridge-tplink-smart-light` to `homebridge-tp-link-
 
 ### Current device types
 
+- Socket/Outlet
 - Light Bulb
-- Socket (**COMING SOON**)
+- LED Strip
+
+For other device type just open a issue.
 
 ### Config
 

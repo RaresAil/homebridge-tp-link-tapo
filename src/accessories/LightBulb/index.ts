@@ -15,10 +15,10 @@ import Platform from '../../platform';
 
 export type AccessoryThisType = ThisType<{
   readonly powerChar: Characteristic;
+  readonly tpLink: TPLink;
   readonly log: Logger;
   readonly mac: string;
   saturation: number;
-  tpLink: TPLink;
   hue: number;
 }>;
 

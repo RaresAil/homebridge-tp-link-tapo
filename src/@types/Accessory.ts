@@ -7,7 +7,8 @@ import Context from './Context';
 
 export enum AccessoryType {
   LightBulb = 'LightBulb',
-  Unknown = 'Unknown'
+  Unknown = 'Unknown',
+  Outlet = 'Outlet'
 }
 
 abstract class Accessory {
@@ -18,6 +19,10 @@ abstract class Accessory {
   public static GetType(deviceInfo: DeviceInfo): AccessoryType {
     if (deviceInfo?.type?.includes('BULB')) {
       return AccessoryType.LightBulb;
+    }
+
+    if (deviceInfo?.type?.includes('PLUG')) {
+      return AccessoryType.Outlet;
     }
 
     return AccessoryType.Unknown;

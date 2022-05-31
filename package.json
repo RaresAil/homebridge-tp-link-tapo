@@ -2,7 +2,7 @@
   "private": false,
   "displayName": "TPLink Tapo",
   "name": "homebridge-tp-link-tapo",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "A platform to implement the tp-link tapo device and Adaptive Lighting for light bulbs",
   "license": "Apache-2.0",
   "repository": {
@@ -51,14 +51,14 @@
   },
   "devDependencies": {
     "@types/async-lock": "^1.1.5",
-    "@types/node": "^17.0.35",
-    "@typescript-eslint/eslint-plugin": "^5.25.0",
-    "@typescript-eslint/parser": "^5.25.0",
-    "eslint": "^8.16.0",
+    "@types/node": "^17.0.40",
+    "@typescript-eslint/eslint-plugin": "^5.27.0",
+    "@typescript-eslint/parser": "^5.27.0",
+    "eslint": "^8.17.0",
     "homebridge": "^1.4.1",
     "nodemon": "^2.0.16",
     "rimraf": "^3.0.2",
-    "ts-node": "^10.8.0",
-    "typescript": "^4.6.4"
+    "ts-node": "^10.8.1",
+    "typescript": "^4.7.3"
   }
 }

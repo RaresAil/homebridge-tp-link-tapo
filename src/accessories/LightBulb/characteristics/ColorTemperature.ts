@@ -10,7 +10,8 @@ import { AccessoryThisType } from '..';
 import {
   toHomeKitValues,
   toTPLinkValues,
-  TP_LINK_VALUES
+  TP_LINK_VALUES,
+  HOME_KIT_VALUES
 } from '../../../utils/translateColorTemp';
 
 const characteristic: {
@@ -19,7 +20,17 @@ const characteristic: {
 } & AccessoryThisType = {
   get: async function (): Promise<Nullable<CharacteristicValue>> {
     const deviceInfo = await this.tpLink.getInfo();
-    return toHomeKitValues(deviceInfo.color_temp || TP_LINK_VALUES.min);
+    const value = toHomeKitValues(deviceInfo.color_temp || TP_LINK_VALUES.min);
+
+    if (value < HOME_KIT_VALUES.min) {
+      return HOME_KIT_VALUES.min;
+    }
+
+    if (value > HOME_KIT_VALUES.max) {
+      return HOME_KIT_VALUES.max;
+    }
+
+    return value;
   },
   set: async function (value: CharacteristicValue) {
     try {
