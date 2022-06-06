@@ -9,12 +9,14 @@ import {
 } from 'homebridge';
 
 import Accessory, { AccessoryType } from './@types/Accessory';
-import LightBulbAccessory from './accessories/LightBulb';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import DeviceInfo from './api/@types/DeviceInfo';
 import Context from './@types/Context';
 import TPLink from './api/TPLink';
 import delay from './utils/delay';
+
+import LightBulbAccessory from './accessories/LightBulb';
+import OutletAccessory from './accessories/Outlet';
 
 export default class Platform implements DynamicPlatformPlugin {
   private readonly TIMEOUT_TRIES = 20;
@@ -129,9 +131,10 @@ export default class Platform implements DynamicPlatformPlugin {
         );
         if (!registeredAccessory) {
           this.log.error(
-            'Failed to register accessory "%s" of type "%s"',
+            'Failed to register accessory "%s" of type "%s" (%s)',
             deviceName,
-            Accessory.GetType(deviceInfo)
+            Accessory.GetType(deviceInfo),
+            deviceInfo?.type
           );
           return;
         }
@@ -153,9 +156,10 @@ export default class Platform implements DynamicPlatformPlugin {
       const registeredAccessory = this.registerAccessory(accessory, deviceInfo);
       if (!registeredAccessory) {
         this.log.error(
-          'Failed to register accessory "%s" of type "%s"',
+          'Failed to register accessory "%s" of type "%s" (%s)',
           deviceName,
-          Accessory.GetType(deviceInfo)
+          Accessory.GetType(deviceInfo),
+          deviceInfo?.type
         );
         return;
       }
@@ -188,7 +192,8 @@ export default class Platform implements DynamicPlatformPlugin {
   }
 
   private readonly accessoryClasses = {
-    [AccessoryType.LightBulb]: LightBulbAccessory
+    [AccessoryType.LightBulb]: LightBulbAccessory,
+    [AccessoryType.Outlet]: OutletAccessory
   };
 
   private registerAccessory(
