@@ -51,14 +51,24 @@ export default class LightBulbAccessory extends Accessory {
   ) {
     super(platform, accessory, log, deviceInfo);
 
+    let isColorTemperatureBlocked = false;
     let hasBrightness = false;
     let hasColors = false;
+
     if (
       deviceInfo.color_temp !== undefined ||
       deviceInfo.saturation !== undefined ||
       deviceInfo.hue !== undefined
     ) {
       hasColors = true;
+    }
+
+    if (
+      deviceInfo.color_temp_range?.length !== undefined &&
+      deviceInfo.color_temp_range?.[0] !== undefined &&
+      deviceInfo.color_temp_range[0] === deviceInfo.color_temp_range?.[1]
+    ) {
+      isColorTemperatureBlocked = true;
     }
 
     if (deviceInfo.brightness !== undefined) {
@@ -92,15 +102,6 @@ export default class LightBulbAccessory extends Accessory {
 
     if (hasColors) {
       this.service
-        .getCharacteristic(this.platform.Characteristic.ColorTemperature)
-        .setProps({
-          minValue: HOME_KIT_VALUES.min,
-          maxValue: HOME_KIT_VALUES.max
-        })
-        .onGet(ColorTemperature.get.bind(this))
-        .onSet(ColorTemperature.set.bind(this));
-
-      this.service
         .getCharacteristic(this.platform.Characteristic.Hue)
         .onGet(Hue.get.bind(this))
         .onSet(Hue.set.bind(this));
@@ -109,6 +110,17 @@ export default class LightBulbAccessory extends Accessory {
         .getCharacteristic(this.platform.Characteristic.Saturation)
         .onGet(Saturation.get.bind(this))
         .onSet(Saturation.set.bind(this));
+    }
+
+    if (hasColors && !isColorTemperatureBlocked) {
+      this.service
+        .getCharacteristic(this.platform.Characteristic.ColorTemperature)
+        .setProps({
+          minValue: HOME_KIT_VALUES.min,
+          maxValue: HOME_KIT_VALUES.max
+        })
+        .onGet(ColorTemperature.get.bind(this))
+        .onSet(ColorTemperature.set.bind(this));
 
       const adaptiveLightingController =
         new this.platform.api.hap.AdaptiveLightingController(this.service, {

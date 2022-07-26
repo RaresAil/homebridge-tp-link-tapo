@@ -1,4 +1,5 @@
 interface DeviceInfo {
+  color_temp_range?: [number, number];
   device_id: string;
   fw_ver: string;
   hw_ver: string;
