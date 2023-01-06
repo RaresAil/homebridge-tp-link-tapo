@@ -177,10 +177,18 @@ export default class Platform implements DynamicPlatformPlugin {
   }
 
   private checkOldDevices() {
+    const addressesByUUID: Record<string, string> = (
+      (this.config?.addresses as string[]) || []
+    ).reduce(
+      (acc, ip) => ({
+        ...acc,
+        [this.api.hap.uuid.generate(ip)]: ip
+      }),
+      {}
+    );
+
     this.accessories.map((accessory) => {
-      const exists = this.registeredDevices.find(
-        (device) => device.UUID === accessory.UUID
-      );
+      const exists = addressesByUUID[accessory.UUID.toString()];
 
       if (!exists) {
         this.log.info('Remove cached accessory:', accessory.displayName);
