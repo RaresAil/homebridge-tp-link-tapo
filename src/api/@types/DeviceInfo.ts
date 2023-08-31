@@ -10,6 +10,7 @@ interface DeviceInfo {
   fw_id: string;
   oem_id: string;
   specs: string;
+  in_alarm?: boolean;
   lang: string;
   device_on: boolean;
   on_time: number;
