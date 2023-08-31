@@ -8,15 +8,18 @@ import {
   Characteristic
 } from 'homebridge';
 
-import Accessory, { AccessoryType } from './@types/Accessory';
+import Accessory, { AccessoryType, ChildType } from './@types/Accessory';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import DeviceInfo from './api/@types/DeviceInfo';
 import Context from './@types/Context';
 import TPLink from './api/TPLink';
 import delay from './utils/delay';
 
+import HubAccessory, { HubContext } from './accessories/Hub';
 import LightBulbAccessory from './accessories/LightBulb';
 import OutletAccessory from './accessories/Outlet';
+import { ChildInfo } from './api/@types/ChildListInfo';
+import ButtonAccessory from './accessories/Button';
 
 export default class Platform implements DynamicPlatformPlugin {
   private readonly TIMEOUT_TRIES = 20;
@@ -25,8 +28,10 @@ export default class Platform implements DynamicPlatformPlugin {
   public readonly Characteristic: typeof Characteristic =
     this.api.hap.Characteristic;
 
-  public readonly accessories: PlatformAccessory<Context>[] = [];
+  public readonly accessories: PlatformAccessory<Context | HubContext>[] = [];
+  public readonly loadedChildUUIDs: Record<string, true> = {};
   public readonly registeredDevices: Accessory[] = [];
+  public readonly hubs: HubAccessory[] = [];
   private readonly deviceRetry: {
     [key: string]: number;
   } = {};
@@ -72,6 +77,20 @@ export default class Platform implements DynamicPlatformPlugin {
 
       await Promise.all(
         addresses.map((address) => this.loadDevice(address, email, password))
+      );
+
+      await Promise.all(
+        this.hubs.map(async (hub) => {
+          const devices = await hub.getChildDevices();
+          await Promise.all(
+            devices.map((device) => {
+              this.loadedChildUUIDs[
+                this.api.hap.uuid.generate(device.device_id)
+              ] = true;
+              return this.loadChildDevice(device.device_id, device, hub);
+            })
+          );
+        })
       );
 
       this.checkOldDevices();
@@ -122,7 +141,8 @@ export default class Platform implements DynamicPlatformPlugin {
         );
         existingAccessory.context = {
           name: deviceName,
-          tpLink
+          tpLink,
+          child: false
         };
 
         const registeredAccessory = this.registerAccessory(
@@ -150,7 +170,8 @@ export default class Platform implements DynamicPlatformPlugin {
       );
       accessory.context = {
         name: deviceName,
-        tpLink
+        tpLink,
+        child: false
       };
 
       const registeredAccessory = this.registerAccessory(accessory, deviceInfo);
@@ -176,6 +197,106 @@ export default class Platform implements DynamicPlatformPlugin {
     }
   }
 
+  private async loadChildDevice(
+    id: string,
+    deviceInfo: ChildInfo,
+    parent: HubAccessory
+  ) {
+    const uuid = this.api.hap.uuid.generate(id);
+    if (this.deviceRetry[uuid] === undefined) {
+      this.deviceRetry[uuid] = this.TIMEOUT_TRIES;
+    } else if (this.deviceRetry[uuid] <= 0) {
+      this.log.info('Retry timeout:', id);
+      return;
+    } else {
+      this.log.info('Retry to connect in 10s', ':', id);
+      await delay(10 * 1000);
+      this.log.info(
+        'Try for',
+        id,
+        ':',
+        `${this.deviceRetry[uuid]}/${this.TIMEOUT_TRIES}`
+      );
+    }
+
+    try {
+      const deviceName = Buffer.from(deviceInfo.nickname, 'base64').toString(
+        'utf-8'
+      );
+
+      const existingAccessory = this.accessories.find(
+        (accessory) => accessory.UUID === uuid
+      );
+
+      if (existingAccessory) {
+        this.log.info(
+          'Restoring existing child accessory from cache:',
+          existingAccessory.displayName
+        );
+        existingAccessory.context = {
+          name: deviceName,
+          child: true,
+          parent: parent.UUID
+        };
+
+        const registeredAccessory = this.registerChild(
+          existingAccessory,
+          deviceInfo,
+          parent
+        );
+
+        if (!registeredAccessory) {
+          this.log.error(
+            'Failed to register child accessory "%s" of type "%s" (%s)',
+            deviceName,
+            Accessory.GetChildType(deviceInfo),
+            deviceInfo?.type
+          );
+          return;
+        }
+
+        this.registeredDevices.push(registeredAccessory);
+        return;
+      }
+
+      this.log.info('Adding new child accessory:', deviceName);
+      const accessory = new this.api.platformAccessory<HubContext>(
+        deviceName,
+        uuid
+      );
+      accessory.context = {
+        name: deviceName,
+        child: true,
+        parent: parent.UUID
+      };
+
+      const registeredAccessory = this.registerChild(
+        accessory,
+        deviceInfo,
+        parent
+      );
+      if (!registeredAccessory) {
+        this.log.error(
+          'Failed to register child accessory "%s" of type "%s" (%s)',
+          deviceName,
+          Accessory.GetChildType(deviceInfo),
+          deviceInfo?.type
+        );
+        return;
+      }
+
+      this.registeredDevices.push(registeredAccessory);
+
+      return this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
+        accessory
+      ]);
+    } catch (err: any) {
+      this.log.error('Failed to get info about child:', id, '|', err.message);
+      this.deviceRetry[uuid] -= 1;
+      return await this.loadChildDevice(id, deviceInfo, parent);
+    }
+  }
+
   private checkOldDevices() {
     const addressesByUUID: Record<string, string> = (
       (this.config?.addresses as string[]) || []
@@ -188,9 +309,16 @@ export default class Platform implements DynamicPlatformPlugin {
     );
 
     this.accessories.map((accessory) => {
-      const exists = addressesByUUID[accessory.UUID.toString()];
+      const deleteDevice =
+        (!accessory.context.child &&
+          !addressesByUUID[accessory.UUID.toString()]) ||
+        (accessory.context.child &&
+          !addressesByUUID[accessory.context.parent]) ||
+        (accessory.context.child &&
+          addressesByUUID[accessory.context.parent] &&
+          !this.loadedChildUUIDs[accessory.UUID.toString()]);
 
-      if (!exists) {
+      if (deleteDevice) {
         this.log.info('Remove cached accessory:', accessory.displayName);
         this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
           accessory
@@ -201,11 +329,12 @@ export default class Platform implements DynamicPlatformPlugin {
 
   private readonly accessoryClasses = {
     [AccessoryType.LightBulb]: LightBulbAccessory,
-    [AccessoryType.Outlet]: OutletAccessory
+    [AccessoryType.Outlet]: OutletAccessory,
+    [AccessoryType.Hub]: HubAccessory
   };
 
   private registerAccessory(
-    accessory: PlatformAccessory<Context>,
+    accessory: PlatformAccessory<Context | HubContext>,
     deviceInfo: DeviceInfo
   ): Accessory | null {
     const AccessoryClass = this.accessoryClasses[Accessory.GetType(deviceInfo)];
@@ -213,6 +342,29 @@ export default class Platform implements DynamicPlatformPlugin {
       return null;
     }
 
-    return new AccessoryClass(this, accessory, this.log, deviceInfo);
+    const acc = new AccessoryClass(this, accessory, this.log, deviceInfo);
+
+    if (acc instanceof HubAccessory) {
+      this.hubs.push(acc);
+    }
+
+    return acc;
+  }
+
+  private readonly childClasses = {
+    [ChildType.Button]: ButtonAccessory
+  };
+
+  private registerChild(
+    accessory: PlatformAccessory<Context | HubContext>,
+    deviceInfo: ChildInfo,
+    parent: HubAccessory
+  ): Accessory | null {
+    const ChildClass = this.childClasses[Accessory.GetChildType(deviceInfo)];
+    if (!ChildClass) {
+      return null;
+    }
+
+    return new ChildClass(parent, this, accessory, this.log, deviceInfo);
   }
 }

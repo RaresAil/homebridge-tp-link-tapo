@@ -1,5 +1,6 @@
 import { Logger, PlatformAccessory } from 'homebridge';
 
+import { ChildInfo } from '../api/@types/ChildListInfo';
 import DeviceInfo from '../api/@types/DeviceInfo';
 import TPLink from '../api/TPLink';
 import Platform from '../platform';
@@ -8,7 +9,13 @@ import Context from './Context';
 export enum AccessoryType {
   LightBulb = 'LightBulb',
   Unknown = 'Unknown',
-  Outlet = 'Outlet'
+  Outlet = 'Outlet',
+  Hub = 'Hub'
+}
+
+export enum ChildType {
+  Unknown = 'Unknown',
+  Button = 'LightBulb'
 }
 
 abstract class Accessory {
@@ -25,7 +32,22 @@ abstract class Accessory {
       return AccessoryType.Outlet;
     }
 
+    if (deviceInfo?.type?.includes('HUB')) {
+      return AccessoryType.Hub;
+    }
+
     return AccessoryType.Unknown;
+  }
+
+  public static GetChildType(deviceInfo: ChildInfo): ChildType {
+    if (
+      deviceInfo?.type?.includes('SENSOR') &&
+      deviceInfo?.category?.includes('button')
+    ) {
+      return ChildType.Button;
+    }
+
+    return ChildType.Unknown;
   }
 
   public abstract get UUID(): string;
@@ -34,7 +56,7 @@ abstract class Accessory {
     protected readonly platform: Platform,
     protected readonly accessory: PlatformAccessory<Context>,
     protected readonly log: Logger,
-    protected readonly deviceInfo: DeviceInfo
+    protected readonly deviceInfo: DeviceInfo | ChildInfo
   ) {
     this.tpLink = accessory.context.tpLink;
     this.model = deviceInfo.model;

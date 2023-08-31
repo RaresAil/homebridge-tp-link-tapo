@@ -1,3 +1,4 @@
+import ChildListInfo from './@types/ChildListInfo';
 import DeviceInfo from './@types/DeviceInfo';
 
 const createBoolCommand =
@@ -6,6 +7,26 @@ const createBoolCommand =
     ({
       [key]: value
     } as any);
+
+const controlChild = (
+  childId: string,
+  method: string,
+  params?: Record<string, unknown>
+) => ({
+  __method__: 'control_child',
+  device_id: childId,
+  requestData: {
+    method: 'multipleRequest',
+    params: {
+      requests: [
+        {
+          method,
+          ...(params ? { params } : {})
+        }
+      ]
+    }
+  }
+});
 
 export default {
   hueAndSaturation: (hue: number, saturation: number): boolean =>
@@ -20,5 +41,29 @@ export default {
   deviceInfo: (): DeviceInfo =>
     ({
       __method__: 'get_device_info'
+    } as any),
+  childDeviceList: (): ChildListInfo =>
+    ({
+      __method__: 'get_child_device_list'
+    } as any),
+  getTriggerLogs: (childId: string): any => ({
+    ...controlChild(childId, 'get_trigger_logs', {
+      start_id: 0,
+      page_size: 4
+    })
+  }),
+  stopAlarm: (): boolean =>
+    ({
+      __method__: 'stop_alarm'
+    } as any),
+  startAlarm: (): boolean =>
+    ({
+      __method__: 'play_alarm',
+      alarm_type: 'Alarm 4',
+      alarm_volume: 'medium'
+    } as any),
+  getAlarmTypes: (): boolean =>
+    ({
+      __method__: 'get_support_alarm_type_list'
     } as any)
 };
