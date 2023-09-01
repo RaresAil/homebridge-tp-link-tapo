@@ -46,5 +46,14 @@ export default class LightBulbAccessory extends Accessory {
       .getCharacteristic(this.platform.Characteristic.On)
       .onGet(On.get.bind(this))
       .onSet(On.set.bind(this));
+
+    // this.tpLink
+    //   .sendCommand('getCurrentPower')
+    //   .then((data) => {
+    //     console.log(data);
+    //   })
+    //   .catch((err) => {
+    //     console.log(err);
+    //   });
   }
 }
