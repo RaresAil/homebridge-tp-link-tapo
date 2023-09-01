@@ -84,6 +84,10 @@ export default class Platform implements DynamicPlatformPlugin {
           const devices = await hub.getChildDevices();
           await Promise.all(
             devices.map((device) => {
+              if (Object.keys(device || {}).length === 0) {
+                return Promise.resolve();
+              }
+
               this.loadedChildUUIDs[
                 this.api.hap.uuid.generate(device.device_id)
               ] = true;
@@ -120,15 +124,16 @@ export default class Platform implements DynamicPlatformPlugin {
     try {
       const tpLink = await new TPLink(ip, email, password, this.log).setup();
       const deviceInfo = await tpLink.getInfo();
-      if (!deviceInfo) {
+      if (Object.keys(deviceInfo || {}).length === 0) {
         this.log.error('Failed to get info about:', ip);
         this.deviceRetry[uuid] -= 1;
         return await this.loadDevice(ip, email, password);
       }
 
-      const deviceName = Buffer.from(deviceInfo.nickname, 'base64').toString(
-        'utf-8'
-      );
+      const deviceName = Buffer.from(
+        deviceInfo?.nickname || 'Tm8gTmFtZQ==',
+        'base64'
+      ).toString('utf-8');
 
       const existingAccessory = this.accessories.find(
         (accessory) => accessory.UUID === uuid
@@ -220,9 +225,10 @@ export default class Platform implements DynamicPlatformPlugin {
     }
 
     try {
-      const deviceName = Buffer.from(deviceInfo.nickname, 'base64').toString(
-        'utf-8'
-      );
+      const deviceName = Buffer.from(
+        deviceInfo.nickname || 'Tm8gTmFtZQ==',
+        'base64'
+      ).toString('utf-8');
 
       const existingAccessory = this.accessories.find(
         (accessory) => accessory.UUID === uuid
