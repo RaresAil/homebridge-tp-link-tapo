@@ -16,15 +16,8 @@ const controlChild = (
   __method__: 'control_child',
   device_id: childId,
   requestData: {
-    method: 'multipleRequest',
-    params: {
-      requests: [
-        {
-          method,
-          ...(params ? { params } : {})
-        }
-      ]
-    }
+    method,
+    ...(params ? { params } : {})
   }
 });
 
@@ -49,7 +42,7 @@ export default {
   getTriggerLogs: (childId: string): any => ({
     ...controlChild(childId, 'get_trigger_logs', {
       start_id: 0,
-      page_size: 4
+      page_size: 1
     })
   }),
   stopAlarm: (): boolean =>
