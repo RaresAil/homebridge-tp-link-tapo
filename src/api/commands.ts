@@ -62,5 +62,8 @@ export default {
   getCurrentPower: (): boolean =>
     ({
       __method__: 'get_current_power'
-    } as any)
+    } as any),
+  checkProtocol: (): any => ({
+    __method__: 'component_nego'
+  })
 };
