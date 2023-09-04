@@ -108,6 +108,19 @@ export default class TPLink {
     );
   }
 
+  public async sendHubCommand<T extends Command>(
+    command: T,
+    childId: string,
+    ...args: Parameters<Commands[T]>
+  ): Promise<CommandReturnType<T>> {
+    return this.lock.acquire(
+      `send-hub-command-${childId}`,
+      (): Promise<CommandReturnType<T>> => {
+        return this.sendCommandWithNoLock(command, args, false);
+      }
+    );
+  }
+
   private async sendCommandWithNoLock<T extends Command>(
     command: T,
     args: Parameters<Commands[T]>,
