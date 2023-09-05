@@ -23,6 +23,9 @@ Package was renamed from `homebridge-tplink-smart-light` to `homebridge-tp-link-
 ### Current device types
 
 - Socket/Outlet
+- Hub (As alarm)
+- Button S200
+- Contact Sensor (T110)
 - Light Bulb
 - LED Strip
 
