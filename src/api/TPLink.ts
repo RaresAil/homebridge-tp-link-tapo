@@ -28,6 +28,14 @@ export default class TPLink {
   private _prevPowerState = false;
   private _unsentData: any = {};
 
+  private commandCache: Record<
+    string,
+    {
+      data: any;
+      setAt: number;
+    }
+  > = {};
+
   private infoCache?: {
     data: DeviceInfo;
     setAt: number;
@@ -66,6 +74,33 @@ export default class TPLink {
     }
 
     return this;
+  }
+
+  public async cacheSendCommand<T extends Command>(
+    deviceId: string,
+    command: T,
+    ...args: Parameters<Commands[T]>
+  ): Promise<ReturnType<Commands[T]>> {
+    const cacheKey = `${deviceId}-${command}`;
+    return this.lock.acquire<ReturnType<Commands[T]>>(
+      `cache-${cacheKey}`,
+      async () => {
+        if (
+          this.commandCache[cacheKey.toString()] &&
+          Date.now() - this.commandCache[cacheKey.toString()].setAt < 100
+        ) {
+          return this.commandCache[cacheKey.toString()].data;
+        }
+
+        const response = (await this.sendCommand(command, ...args)) ?? {};
+        this.commandCache[cacheKey.toString()] = {
+          data: response,
+          setAt: Date.now()
+        };
+
+        return response;
+      }
+    );
   }
 
   public async getInfo(): Promise<DeviceInfo> {

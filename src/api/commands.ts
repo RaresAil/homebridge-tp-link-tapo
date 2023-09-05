@@ -65,7 +65,7 @@ export default {
     ({
       __method__: 'get_support_alarm_type_list'
     } as any),
-  getCurrentPower: (): boolean =>
+  getCurrentPower: (): { current_power: number } =>
     ({
       __method__: 'get_current_power'
     } as any),
