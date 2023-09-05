@@ -1,11 +1,12 @@
 import AsyncLock from 'async-lock';
-import crypto from 'crypto';
-import axios from 'axios';
 
+import { ChildInfo } from './@types/ChildListInfo';
 import DeviceInfo from './@types/DeviceInfo';
-import TpLinkCipher from './TpLinkCipher';
+// import Protocol from './@types/Protocol';
 import { Logger } from 'homebridge';
+import LegacyAPI from './LegacyAPI';
 import commands from './commands';
+import API from './@types/API';
 
 export interface HandshakeData {
   cookie?: string;
@@ -17,39 +18,45 @@ type Command = keyof Commands;
 type CommandReturnType<T extends Command> = ReturnType<Commands[T]>;
 
 export default class TPLink {
-  private readonly terminalUUID: string;
   private readonly lock: AsyncLock;
+  private api: API;
 
-  private handshakeData: HandshakeData = {
-    expire: 0
-  };
-
-  private tpLinkCipher?: TpLinkCipher;
-  private privateKey?: string;
-  private publicKey?: string;
   private classSetup = false;
 
   private tryResendCommand = false;
-  private loginToken?: string;
 
   private _prevPowerState = false;
   private _unsentData: any = {};
+
+  private commandCache: Record<
+    string,
+    {
+      data: any;
+      setAt: number;
+    }
+  > = {};
 
   private infoCache?: {
     data: DeviceInfo;
     setAt: number;
   };
 
+  private childInfoCache: Record<
+    string,
+    {
+      data: ChildInfo;
+      setAt: number;
+    }
+  > = {};
+
   constructor(
-    private readonly ip: string,
-    private readonly email: string,
-    private readonly password: string,
+    ip: string,
+    email: string,
+    password: string,
     private readonly log: Logger
   ) {
-    this.email = TpLinkCipher.toBase64(TpLinkCipher.encodeUsername(this.email));
-    this.password = TpLinkCipher.toBase64(this.password);
-    this.terminalUUID = crypto.randomUUID();
     this.lock = new AsyncLock();
+    this.api = new LegacyAPI(ip, email, password, log);
   }
 
   public async setup(): Promise<TPLink> {
@@ -58,15 +65,42 @@ export default class TPLink {
         return this;
       }
 
-      const keys = await TpLinkCipher.createKeyPair();
-      this.publicKey = keys.public;
-      this.privateKey = keys.private;
+      await this.api.setup();
       this.classSetup = true;
+
+      // await this.checkProtocol();
     } catch (e) {
       this.log.error('Error setting up TPLink class:', e);
     }
 
     return this;
+  }
+
+  public async cacheSendCommand<T extends Command>(
+    deviceId: string,
+    command: T,
+    ...args: Parameters<Commands[T]>
+  ): Promise<ReturnType<Commands[T]>> {
+    const cacheKey = `${deviceId}-${command}`;
+    return this.lock.acquire<ReturnType<Commands[T]>>(
+      `cache-${cacheKey}`,
+      async () => {
+        if (
+          this.commandCache[cacheKey.toString()] &&
+          Date.now() - this.commandCache[cacheKey.toString()].setAt < 100
+        ) {
+          return this.commandCache[cacheKey.toString()].data;
+        }
+
+        const response = (await this.sendCommand(command, ...args)) ?? {};
+        this.commandCache[cacheKey.toString()] = {
+          data: response,
+          setAt: Date.now()
+        };
+
+        return response;
+      }
+    );
   }
 
   public async getInfo(): Promise<DeviceInfo> {
@@ -82,6 +116,28 @@ export default class TPLink {
       };
 
       this._prevPowerState = deviceInfo.device_on ?? false;
+      return deviceInfo;
+    });
+  }
+
+  public async getChildInfo(childId: string): Promise<ChildInfo> {
+    return this.lock.acquire('get-child-info-cache', async () => {
+      if (
+        this.childInfoCache[childId.toString()] &&
+        Date.now() - this.childInfoCache[childId.toString()].setAt < 10000
+      ) {
+        return this.childInfoCache[childId.toString()].data;
+      }
+
+      const rawInfo =
+        (await this.sendCommand('childDeviceInfo', childId)) ?? {};
+      const deviceInfo = rawInfo?.responseData?.result ?? {};
+
+      this.childInfoCache[childId.toString()] = {
+        data: deviceInfo,
+        setAt: Date.now()
+      };
+
       return deviceInfo;
     });
   }
@@ -108,6 +164,19 @@ export default class TPLink {
     );
   }
 
+  public async sendHubCommand<T extends Command>(
+    command: T,
+    childId: string,
+    ...args: Parameters<Commands[T]>
+  ): Promise<CommandReturnType<T>> {
+    return this.lock.acquire(
+      `send-hub-command-${childId}`,
+      (): Promise<CommandReturnType<T>> => {
+        return this.sendCommandWithNoLock(command, args, false);
+      }
+    );
+  }
+
   private async sendCommandWithNoLock<T extends Command>(
     command: T,
     args: Parameters<Commands[T]>,
@@ -118,16 +187,12 @@ export default class TPLink {
         return false as CommandReturnType<T>;
       }
 
-      if (
-        !this.loginToken ||
-        this.needsNewHandshake() ||
-        this.tryResendCommand
-      ) {
+      if (this.api.needsNewHandshake() || this.tryResendCommand) {
         if (this.tryResendCommand) {
           this.log.info('Trying to login again.');
         }
 
-        await this.login();
+        await this.api.login();
       }
 
       const { __method__, ...params } = commands[command.toString()](...args);
@@ -162,13 +227,14 @@ export default class TPLink {
         this._unsentData = {};
       }
 
-      const { body } = await this.sendSecureRequest(
+      const { body } = await this.api.sendSecureRequest(
         validMethod,
         {
           ...extraData,
           ...params
         },
-        true
+        true,
+        false
       );
 
       if (body.error_code && body.error_code !== 0) {
@@ -198,152 +264,14 @@ export default class TPLink {
     }
   }
 
-  private async login() {
-    const { body } = await this.sendSecureRequest(
-      'login_device',
-      {
-        username: this.email,
-        password: this.password
-      },
-      false,
-      true
-    );
-
-    this.loginToken = body?.result?.token;
-  }
-
-  private async sendRequest(
-    method: string,
-    params: {
-      [key: string]: any;
-    },
-    setCookie = false
-  ) {
-    return axios.post(
-      `http://${this.ip}/app`,
-      JSON.stringify({
-        method,
-        params,
-        requestTimeMils: Date.now()
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(setCookie && this.handshakeData.cookie
-            ? {
-                Cookie: this.handshakeData.cookie
-              }
-            : {})
-        }
-      }
-    );
-  }
-
-  private async sendSecureRequest(
-    method: string,
-    params: {
-      [key: string]: any;
-    },
-    useToken = false,
-    forceHandshake = false
-  ): Promise<any> {
-    if (forceHandshake) {
-      await this.handshake();
-    } else {
-      if (this.needsNewHandshake()) {
-        await this.handshake();
-      }
-    }
-
-    const response = await axios.post(
-      `http://${this.ip}/app${useToken ? `?token=${this.loginToken!}` : ''}`,
-      JSON.stringify({
-        method: 'securePassthrough',
-        params: {
-          request: this.tpLinkCipher!.encrypt(
-            JSON.stringify({
-              method,
-              params,
-              requestTimeMils: Date.now(),
-              terminalUUID: this.terminalUUID
-            })
-          )
-        }
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: this.handshakeData.cookie!
-        }
-      }
-    );
-
-    let body = response?.data;
-    if (body?.result?.response) {
-      body = JSON.parse(this.tpLinkCipher!.decrypt(body.result.response));
-    }
-
-    return {
-      response,
-      body
-    };
-  }
-
-  private needsNewHandshake() {
-    if (!this.classSetup) {
-      throw new Error('Execute the .setup() first!');
-    }
-
-    if (!this.tpLinkCipher) {
-      return true;
-    }
-
-    if (this.handshakeData.expire - Date.now() <= 40 * 1000) {
-      return true;
-    }
-
-    if (!this.handshakeData.cookie) {
-      return true;
-    }
-
-    return false;
-  }
-
-  private async handshake() {
-    const response = await this.sendRequest('handshake', {
-      key: this.publicKey!
-    });
-
-    const key = response?.data?.result?.key;
-    const [cookie, timeout] =
-      response?.headers?.['set-cookie']?.[0]?.split(';') ?? [];
-    const expire = parseInt((timeout ?? '').split('=')[1] ?? '0');
-
-    this.handshakeData.expire = Date.now() + expire * 1000;
-    this.handshakeData.cookie = cookie;
-
-    this.tpLinkCipher = this.decodeHandshakeKey(key);
-  }
-
-  private decodeHandshakeKey(key: string) {
-    if (!this.classSetup) {
-      throw new Error('Execute the .setup() first!');
-    }
-
-    const decodedKey = Buffer.from(key, 'base64');
-    const decrypted = crypto.privateDecrypt(
-      {
-        key: this.privateKey!,
-        padding: crypto.constants.RSA_PKCS1_PADDING
-      },
-      decodedKey
-    );
-
-    const keyLen = 16;
-
-    return new TpLinkCipher(
-      decrypted.slice(0, keyLen),
-      decrypted.slice(keyLen, keyLen * 2)
-    );
-  }
+  // private async checkProtocol(): Promise<Protocol> {
+  //   try {
+  //     const response = await this.api.sendRequest('checkProtocol', {}, false);
+  //     console.log(response.data, response.status);
+  //     return Protocol.Legacy;
+  //   } catch (e) {
+  //     console.error('Legacy protocol not supported', e);
+  //     return Protocol.KLAP;
+  //   }
+  // }
 }

@@ -22,7 +22,10 @@ Package was renamed from `homebridge-tplink-smart-light` to `homebridge-tp-link-
 
 ### Current device types
 
-- Socket/Outlet
+- Socket/Outlet (For devices with power measurement, they have a contact sensor, open means the current is > 0 and closed is 0)
+- Hub (As alarm)
+- Button S200
+- Contact Sensor (T110)
 - Light Bulb
 - LED Strip
 

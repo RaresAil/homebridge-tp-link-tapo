@@ -1,5 +1,11 @@
-import ChildListInfo from './@types/ChildListInfo';
+import ChildListInfo, { ChildInfo } from './@types/ChildListInfo';
 import DeviceInfo from './@types/DeviceInfo';
+
+type ChildResponse<T> = {
+  responseData: {
+    result: T;
+  };
+};
 
 const createBoolCommand =
   <T>(key: string) =>
@@ -16,15 +22,8 @@ const controlChild = (
   __method__: 'control_child',
   device_id: childId,
   requestData: {
-    method: 'multipleRequest',
-    params: {
-      requests: [
-        {
-          method,
-          ...(params ? { params } : {})
-        }
-      ]
-    }
+    method,
+    ...(params ? { params } : {})
   }
 });
 
@@ -49,7 +48,7 @@ export default {
   getTriggerLogs: (childId: string): any => ({
     ...controlChild(childId, 'get_trigger_logs', {
       start_id: 0,
-      page_size: 4
+      page_size: 1
     })
   }),
   stopAlarm: (): boolean =>
@@ -65,5 +64,16 @@ export default {
   getAlarmTypes: (): boolean =>
     ({
       __method__: 'get_support_alarm_type_list'
+    } as any),
+  getCurrentPower: (): { current_power: number } =>
+    ({
+      __method__: 'get_current_power'
+    } as any),
+  checkProtocol: (): any => ({
+    __method__: 'component_nego'
+  }),
+  childDeviceInfo: (childId: string): ChildResponse<ChildInfo> =>
+    ({
+      ...controlChild(childId, 'get_device_info')
     } as any)
 };

@@ -1,5 +1,6 @@
 import { PlatformAccessory, Service, Logger } from 'homebridge';
 
+import InUse from './characteristics/InUse';
 import On from './characteristics/On';
 
 import DeviceInfo from '../../api/@types/DeviceInfo';
@@ -46,5 +47,39 @@ export default class LightBulbAccessory extends Accessory {
       .getCharacteristic(this.platform.Characteristic.On)
       .onGet(On.get.bind(this))
       .onSet(On.set.bind(this));
+
+    this.setupAdditionalCharacteristics();
+  }
+
+  private async setupAdditionalCharacteristics() {
+    const current = this.service.getCharacteristic(
+      this.platform.Characteristic.ContactSensorState
+    );
+
+    try {
+      const check = await this.tpLink.sendCommand('getCurrentPower');
+      if (
+        check.current_power === undefined ||
+        check.current_power === null ||
+        !Number.isFinite(check.current_power)
+      ) {
+        throw new Error('Not supported');
+      }
+
+      (
+        current ||
+        this.service.addCharacteristic(
+          this.platform.Characteristic.ContactSensorState
+        )
+      ).onGet(InUse.get.bind(this));
+
+      this.log.debug('InUse characteristic supported.');
+    } catch {
+      this.log.debug('InUse characteristic not supported, ignoring.');
+
+      if (current) {
+        this.service.removeCharacteristic(current);
+      }
+    }
   }
 }

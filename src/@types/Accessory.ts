@@ -15,7 +15,8 @@ export enum AccessoryType {
 
 export enum ChildType {
   Unknown = 'Unknown',
-  Button = 'LightBulb'
+  Button = 'LightBulb',
+  Contact = 'Contact'
 }
 
 abstract class Accessory {
@@ -40,11 +41,14 @@ abstract class Accessory {
   }
 
   public static GetChildType(deviceInfo: ChildInfo): ChildType {
-    if (
-      deviceInfo?.type?.includes('SENSOR') &&
-      deviceInfo?.category?.includes('button')
-    ) {
-      return ChildType.Button;
+    if (deviceInfo?.type?.includes('SENSOR')) {
+      if (deviceInfo?.category?.includes('button')) {
+        return ChildType.Button;
+      }
+
+      if (deviceInfo?.category?.includes('contact-sensor')) {
+        return ChildType.Contact;
+      }
     }
 
     return ChildType.Unknown;

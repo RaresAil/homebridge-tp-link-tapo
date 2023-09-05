@@ -9,12 +9,18 @@ import delay from '../../utils/delay';
 
 import StatusLowBattery from './characteristics/StatusLowBattery';
 
+export enum Status {
+  KeepOpen = 'keepOpen',
+  Closed = 'close',
+  Open = 'open'
+}
+
 export type AccessoryThisType = ThisType<{
   readonly hub: HubAccessory;
   readonly getInfo: () => Promise<ChildInfo>;
 }>;
 
-export default class ButtonAccessory extends Accessory {
+export default class ContactAccessory extends Accessory {
   private interval?: NodeJS.Timeout;
   private lastEventUpdate = 0;
 
@@ -50,49 +56,28 @@ export default class ButtonAccessory extends Accessory {
       .setCharacteristic(this.platform.Characteristic.SerialNumber, this.mac);
 
     const service =
-      this.accessory.getService(
-        this.platform.Service.StatelessProgrammableSwitch
-      ) ||
-      this.accessory.addService(
-        this.platform.Service.StatelessProgrammableSwitch
-      );
+      this.accessory.getService(this.platform.Service.ContactSensor) ||
+      this.accessory.addService(this.platform.Service.ContactSensor);
 
-    const characteristic = service
-      .getCharacteristic(this.platform.Characteristic.ProgrammableSwitchEvent)
-      .setProps({
-        validValues: [
-          this.platform.Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS,
-          this.platform.Characteristic.ProgrammableSwitchEvent.DOUBLE_PRESS
-        ]
-      });
+    const characteristic = service.getCharacteristic(
+      this.platform.Characteristic.ContactSensorState
+    );
 
-    (
-      service.getCharacteristic(
-        this.platform.Characteristic.StatusLowBattery
-      ) ||
-      service.addCharacteristic(this.platform.Characteristic.StatusLowBattery)
-    ).onGet(StatusLowBattery.get.bind(this));
+    service
+      .getCharacteristic(this.platform.Characteristic.StatusLowBattery)
+      .onGet(StatusLowBattery.get.bind(this));
 
-    const checkStatus = async () => {
+    const checkStatus = async (initStatus?: Status) => {
       try {
+        if (initStatus) {
+          characteristic.updateValue(this.statusToValue(initStatus));
+        }
+
         const response = await this.hub.getChildLogs(this.deviceInfo.device_id);
         const lastEvent = response?.logs?.[0];
         if (this.lastEventUpdate < lastEvent?.timestamp) {
           this.lastEventUpdate = lastEvent?.timestamp ?? 0;
-          switch (lastEvent?.event ?? '') {
-            case 'singleClick':
-              characteristic.updateValue(
-                this.platform.Characteristic.ProgrammableSwitchEvent
-                  .SINGLE_PRESS
-              );
-              break;
-            case 'doubleClick':
-              characteristic.updateValue(
-                this.platform.Characteristic.ProgrammableSwitchEvent
-                  .DOUBLE_PRESS
-              );
-              break;
-          }
+          characteristic.updateValue(this.statusToValue(lastEvent?.event));
         }
       } catch (error) {
         this.log.error('Failed to check for updates', error);
@@ -102,16 +87,28 @@ export default class ButtonAccessory extends Accessory {
       checkStatus();
     };
 
-    this.setup(() => checkStatus());
+    this.setup((x) => checkStatus(x));
   }
 
   cleanup() {
     clearInterval(this.interval!);
   }
 
-  private async setup(callback: () => void) {
+  private async setup(callback: (x: Status) => void) {
     const init = await this.hub.getChildLogs(this.deviceInfo.device_id);
-    this.lastEventUpdate = init?.logs?.[0].timestamp ?? 0;
-    callback();
+    const initEvent = init?.logs?.[0];
+    this.lastEventUpdate = initEvent?.timestamp ?? 0;
+    callback(initEvent?.event ?? Status.KeepOpen);
+  }
+
+  private statusToValue(status: Status) {
+    switch (status) {
+      case Status.Open:
+      case Status.KeepOpen:
+        return this.platform.Characteristic.ContactSensorState
+          .CONTACT_NOT_DETECTED;
+      default:
+        return this.platform.Characteristic.ContactSensorState.CONTACT_DETECTED;
+    }
   }
 }
