@@ -45,6 +45,10 @@ export default class HubAccessory extends Accessory {
     return response.child_device_list;
   }
 
+  public async getChildInfo(childId: string) {
+    return this.tpLink.getChildInfo(childId);
+  }
+
   public async getChildLogs(childId: string) {
     const response = await this.tpLink.sendHubCommand(
       'getTriggerLogs',

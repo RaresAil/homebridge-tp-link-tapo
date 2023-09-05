@@ -1,5 +1,11 @@
-import ChildListInfo from './@types/ChildListInfo';
+import ChildListInfo, { ChildInfo } from './@types/ChildListInfo';
 import DeviceInfo from './@types/DeviceInfo';
+
+type ChildResponse<T> = {
+  responseData: {
+    result: T;
+  };
+};
 
 const createBoolCommand =
   <T>(key: string) =>
@@ -65,5 +71,9 @@ export default {
     } as any),
   checkProtocol: (): any => ({
     __method__: 'component_nego'
-  })
+  }),
+  childDeviceInfo: (childId: string): ChildResponse<ChildInfo> =>
+    ({
+      ...controlChild(childId, 'get_device_info')
+    } as any)
 };

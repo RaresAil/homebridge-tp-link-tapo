@@ -20,6 +20,7 @@ import LightBulbAccessory from './accessories/LightBulb';
 import OutletAccessory from './accessories/Outlet';
 import { ChildInfo } from './api/@types/ChildListInfo';
 import ButtonAccessory from './accessories/Button';
+import ContactAccessory from './accessories/Contact';
 
 export default class Platform implements DynamicPlatformPlugin {
   private readonly TIMEOUT_TRIES = 20;
@@ -358,7 +359,8 @@ export default class Platform implements DynamicPlatformPlugin {
   }
 
   private readonly childClasses = {
-    [ChildType.Button]: ButtonAccessory
+    [ChildType.Button]: ButtonAccessory,
+    [ChildType.Contact]: ContactAccessory
   };
 
   private registerChild(

@@ -1,11 +1,12 @@
 import AsyncLock from 'async-lock';
 
+import { ChildInfo } from './@types/ChildListInfo';
 import DeviceInfo from './@types/DeviceInfo';
+// import Protocol from './@types/Protocol';
 import { Logger } from 'homebridge';
 import LegacyAPI from './LegacyAPI';
 import commands from './commands';
 import API from './@types/API';
-// import Protocol from './@types/Protocol';
 
 export interface HandshakeData {
   cookie?: string;
@@ -31,6 +32,14 @@ export default class TPLink {
     data: DeviceInfo;
     setAt: number;
   };
+
+  private childInfoCache: Record<
+    string,
+    {
+      data: ChildInfo;
+      setAt: number;
+    }
+  > = {};
 
   constructor(
     ip: string,
@@ -72,6 +81,28 @@ export default class TPLink {
       };
 
       this._prevPowerState = deviceInfo.device_on ?? false;
+      return deviceInfo;
+    });
+  }
+
+  public async getChildInfo(childId: string): Promise<ChildInfo> {
+    return this.lock.acquire('get-child-info-cache', async () => {
+      if (
+        this.childInfoCache[childId.toString()] &&
+        Date.now() - this.childInfoCache[childId.toString()].setAt < 10000
+      ) {
+        return this.childInfoCache[childId.toString()].data;
+      }
+
+      const rawInfo =
+        (await this.sendCommand('childDeviceInfo', childId)) ?? {};
+      const deviceInfo = rawInfo?.responseData?.result ?? {};
+
+      this.childInfoCache[childId.toString()] = {
+        data: deviceInfo,
+        setAt: Date.now()
+      };
+
       return deviceInfo;
     });
   }
