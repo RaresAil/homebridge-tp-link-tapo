@@ -7,12 +7,23 @@ import Context from '../../@types/Context';
 import Platform from '../../platform';
 import delay from '../../utils/delay';
 
+import StatusLowBattery from './characteristics/StatusLowBattery';
+
+export type AccessoryThisType = ThisType<{
+  readonly hub: HubAccessory;
+  readonly getInfo: () => Promise<ChildInfo>;
+}>;
+
 export default class ButtonAccessory extends Accessory {
   private interval?: NodeJS.Timeout;
   private lastEventUpdate = 0;
 
   public get UUID() {
     return this.accessory.UUID.toString();
+  }
+
+  private getInfo() {
+    return this.hub.getChildInfo(this.deviceInfo.device_id);
   }
 
   constructor(
@@ -54,6 +65,13 @@ export default class ButtonAccessory extends Accessory {
           this.platform.Characteristic.ProgrammableSwitchEvent.DOUBLE_PRESS
         ]
       });
+
+    (
+      service.getCharacteristic(
+        this.platform.Characteristic.StatusLowBattery
+      ) ||
+      service.addCharacteristic(this.platform.Characteristic.StatusLowBattery)
+    ).onGet(StatusLowBattery.get.bind(this));
 
     const checkStatus = async () => {
       try {
