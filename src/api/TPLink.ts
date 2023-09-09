@@ -2,11 +2,12 @@ import AsyncLock from 'async-lock';
 
 import { ChildInfo } from './@types/ChildListInfo';
 import DeviceInfo from './@types/DeviceInfo';
-// import Protocol from './@types/Protocol';
+import Protocol from './@types/Protocol';
 import { Logger } from 'homebridge';
 import LegacyAPI from './LegacyAPI';
 import commands from './commands';
 import API from './@types/API';
+import KlapAPI from './KlapAPI';
 
 export interface HandshakeData {
   cookie?: string;
@@ -18,7 +19,14 @@ type Command = keyof Commands;
 type CommandReturnType<T extends Command> = ReturnType<Commands[T]>;
 
 export default class TPLink {
+  public get protocol(): Protocol {
+    return this._protocol;
+  }
+
+  private _protocol: Protocol = Protocol.Legacy;
+
   private readonly lock: AsyncLock;
+
   private api: API;
 
   private classSetup = false;
@@ -50,9 +58,9 @@ export default class TPLink {
   > = {};
 
   constructor(
-    ip: string,
-    email: string,
-    password: string,
+    private readonly ip: string,
+    private readonly email: string,
+    private readonly password: string,
     private readonly log: Logger
   ) {
     this.lock = new AsyncLock();
@@ -68,7 +76,10 @@ export default class TPLink {
       await this.api.setup();
       this.classSetup = true;
 
-      // await this.checkProtocol();
+      this._protocol = await this.checkProtocol();
+      if (this._protocol === Protocol.KLAP) {
+        this.api = new KlapAPI(this.ip, this.email, this.password, this.log);
+      }
     } catch (e) {
       this.log.error('Error setting up TPLink class:', e);
     }
@@ -264,14 +275,19 @@ export default class TPLink {
     }
   }
 
-  // private async checkProtocol(): Promise<Protocol> {
-  //   try {
-  //     const response = await this.api.sendRequest('checkProtocol', {}, false);
-  //     console.log(response.data, response.status);
-  //     return Protocol.Legacy;
-  //   } catch (e) {
-  //     console.error('Legacy protocol not supported', e);
-  //     return Protocol.KLAP;
-  //   }
-  // }
+  private async checkProtocol(): Promise<Protocol> {
+    this.log.debug('Checking protocol');
+    const response = await this.api.sendRequest('checkProtocol', {}, false);
+
+    if (
+      typeof response.data === 'object' &&
+      response.data.error_code === -1010
+    ) {
+      this.log.debug(`Using KLAP protocol for ${this.ip}`);
+      return Protocol.KLAP;
+    }
+
+    this.log.debug(`Using Legacy protocol for ${this.ip}`);
+    return Protocol.Legacy;
+  }
 }
