@@ -7,7 +7,7 @@ import { Logger } from 'homebridge';
 import LegacyAPI from './LegacyAPI';
 import commands from './commands';
 import API from './@types/API';
-import KlapAPI from './KlapAPI';
+import axios from 'axios';
 
 export interface HandshakeData {
   cookie?: string;
@@ -78,7 +78,7 @@ export default class TPLink {
 
       this._protocol = await this.checkProtocol();
       if (this._protocol === Protocol.KLAP) {
-        this.api = new KlapAPI(this.ip, this.email, this.password, this.log);
+        this.log.warn('KLAP protocol is not supported yet.');
       }
     } catch (e) {
       this.log.error('Error setting up TPLink class:', e);
@@ -276,18 +276,17 @@ export default class TPLink {
   }
 
   private async checkProtocol(): Promise<Protocol> {
-    this.log.debug('Checking protocol');
-    const response = await this.api.sendRequest('checkProtocol', {}, false);
-
-    if (
-      typeof response.data === 'object' &&
-      response.data.error_code === -1010
-    ) {
-      this.log.debug(`Using KLAP protocol for ${this.ip}`);
-      return Protocol.KLAP;
+    try {
+      this.log.debug('Checking protocol');
+      await axios.get(`http://${this.ip}/app/handshake1`);
+    } catch (e: any) {
+      if (e?.response?.status === 400) {
+        this.log.debug(`Using KLAP protocol for ${this.ip}`);
+        return Protocol.KLAP;
+      }
     }
 
-    this.log.debug(`Using Legacy protocol for ${this.ip}`);
+    this.log.debug(`Using legacy protocol for ${this.ip}`);
     return Protocol.Legacy;
   }
 }

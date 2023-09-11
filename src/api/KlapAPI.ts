@@ -15,6 +15,8 @@ export default class KlapAPI extends API {
   private publicKey?: string;
   private classSetup = false;
 
+  private lSeed?: Buffer;
+
   public async login() {
     const { body } = await this.sendSecureRequest(
       'login_device',
@@ -72,10 +74,10 @@ export default class KlapAPI extends API {
     forceHandshake = false
   ) {
     if (forceHandshake) {
-      await this.handshake();
+      await this.firstHandshake();
     } else {
       if (this.needsNewHandshake()) {
-        await this.handshake();
+        await this.firstHandshake();
       }
     }
 
@@ -137,20 +139,25 @@ export default class KlapAPI extends API {
     return false;
   }
 
-  private async handshake() {
-    const response = await this.sendRequest('handshake', {
-      key: this.publicKey!
-    });
+  private async firstHandshake(seed?: Buffer) {
+    this.lSeed = seed ? seed : crypto.randomBytes(16);
+    // const response = await this.sendRequest('handshake', {
+    //   key: this.publicKey!
+    // });
 
-    const key = response?.data?.result?.key;
-    const [cookie, timeout] =
-      response?.headers?.['set-cookie']?.[0]?.split(';') ?? [];
-    const expire = parseInt((timeout ?? '').split('=')[1] ?? '0');
+    // console.log(
+    //   await this.sessionPost('/handshake1', this.lSeed.toString('base64'))
+    // );
 
-    this.handshakeData.expire = Date.now() + expire * 1000;
-    this.handshakeData.cookie = cookie;
+    // const key = response?.data?.result?.key;
+    // const [cookie, timeout] =
+    //   response?.headers?.['set-cookie']?.[0]?.split(';') ?? [];
+    // const expire = parseInt((timeout ?? '').split('=')[1] ?? '0');
 
-    this.tpLinkCipher = this.decodeHandshakeKey(key);
+    // this.handshakeData.expire = Date.now() + expire * 1000;
+    // this.handshakeData.cookie = cookie;
+
+    // this.tpLinkCipher = this.decodeHandshakeKey(key);
   }
 
   private decodeHandshakeKey(key: string) {
@@ -174,4 +181,15 @@ export default class KlapAPI extends API {
       decrypted.subarray(keyLen, keyLen * 2)
     );
   }
+
+  private async sessionPost(path: string, payload: string) {
+    return axios.post(`http://${this.ip}/app${path}`, payload, {
+      headers: {
+        // 'Content-Type': 'application/json',
+        // Cookie: cookie
+      }
+    });
+  }
 }
+
+// class Session {}
