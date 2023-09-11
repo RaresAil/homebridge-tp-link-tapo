@@ -143,6 +143,11 @@ export default class LegacyAPI extends API {
     });
 
     const key = response?.data?.result?.key;
+
+    if (!key) {
+      throw new Error('Failed to handshake with device');
+    }
+
     const [cookie, timeout] =
       response?.headers?.['set-cookie']?.[0]?.split(';') ?? [];
     const expire = parseInt((timeout ?? '').split('=')[1] ?? '0');
