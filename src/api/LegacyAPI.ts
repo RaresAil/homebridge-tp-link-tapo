@@ -26,6 +26,7 @@ export default class LegacyAPI extends API {
       true
     );
 
+    this.log.debug('[Login] BE AWARE, SENSITIVE DATA!!', JSON.stringify(body));
     this.loginToken = body?.result?.token;
   }
 
@@ -43,7 +44,7 @@ export default class LegacyAPI extends API {
     },
     setCookie = false
   ) {
-    return axios.post(
+    const response = await axios.post(
       `http://${this.ip}/app`,
       JSON.stringify({
         method,
@@ -61,6 +62,9 @@ export default class LegacyAPI extends API {
         }
       }
     );
+
+    this.log.debug('[Send Normal Request]', JSON.stringify(response.data));
+    return response;
   }
 
   public async sendSecureRequest(
@@ -107,6 +111,8 @@ export default class LegacyAPI extends API {
       body = JSON.parse(this.tpLinkCipher!.decrypt(body.result.response));
     }
 
+    this.log.debug('[Send Secure Request]', JSON.stringify(body));
+
     return {
       response,
       body
@@ -114,6 +120,7 @@ export default class LegacyAPI extends API {
   }
 
   public needsNewHandshake() {
+    this.log.debug('[Needs Handshake] Check for Handshake');
     if (!this.classSetup) {
       throw new Error('Execute the .setup() first!');
     }
@@ -143,6 +150,7 @@ export default class LegacyAPI extends API {
     });
 
     const key = response?.data?.result?.key;
+    this.log.debug('[Handshake]', JSON.stringify(response.data));
 
     if (!key) {
       throw new Error('Failed to handshake with device');
@@ -159,6 +167,7 @@ export default class LegacyAPI extends API {
   }
 
   private decodeHandshakeKey(key: string) {
+    this.log.debug('[Decode Handshake] Decoding handshake key');
     if (!this.classSetup) {
       throw new Error('Execute the .setup() first!');
     }
