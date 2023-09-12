@@ -281,17 +281,8 @@ export default class TPLink {
   private async checkProtocol(): Promise<Protocol> {
     try {
       this.log.debug('Checking protocol');
-      const params = new URLSearchParams();
-      params.append('check', '');
-      const response = await axios.post(
-        `http://${this.ip}/app/handshake1`,
-        params
-      );
-
-      this.log.debug('Protocol check response:', JSON.stringify(response.data));
-
-      const data = response.data;
-      if (data.error_code === -1) {
+      const response = await this.api.sendRequest('component_nego', {}, false);
+      if (response.data.error_code === 1003) {
         this.log.debug(`Using KLAP protocol for ${this.ip}`);
         return Protocol.KLAP;
       }
@@ -300,11 +291,6 @@ export default class TPLink {
         'Protocol error response:',
         JSON.stringify(e?.response?.data || e?.response || e)
       );
-
-      if (e?.response?.status === 400) {
-        this.log.debug(`Using KLAP protocol for ${this.ip}`);
-        return Protocol.KLAP;
-      }
     }
 
     this.log.debug(`Using legacy protocol for ${this.ip}`);
