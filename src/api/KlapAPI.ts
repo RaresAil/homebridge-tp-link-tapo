@@ -6,9 +6,14 @@ import { HandshakeData } from './TPLink';
 import API from './@types/API';
 
 export default class KlapAPI extends API {
+  private static readonly TP_TEST_USER = 'test@tp-link.net';
+  private static readonly TP_TEST_PASSWORD = 'test';
+
   private handshakeData: HandshakeData = {
     expire: 0
   };
+
+  private session?: Session;
 
   private tpLinkCipher?: TpLinkCipher;
   private privateKey?: string;
@@ -153,43 +158,98 @@ export default class KlapAPI extends API {
     }
 
     const cookie = handshake1Result.headers['set-cookie']?.[0];
-    const data = Buffer.from(handshake1Result.data);
+    const data = handshake1Result.data;
 
     const [session, timeout] = cookie!
       .split(';')
       .map((c) => c.split('=').pop());
 
-    console.log(new Session(timeout!, session!), data);
-  }
+    this.session = new Session(timeout!, session!);
 
-  private decodeHandshakeKey(key: string) {
-    if (!this.classSetup) {
-      throw new Error('Execute the .setup() first!');
+    const remoteSeed: Buffer = data.subarray(0, 16);
+    const serverHash: Buffer = data.subarray(16);
+
+    this.log.debug(
+      'First handshake decoded successfully:\nRemote Seed:',
+      remoteSeed.toString('hex'),
+      '\nServer Hash:',
+      serverHash.toString('hex'),
+      '\nSession:',
+      session
+    );
+
+    const localAuthHash = this.sha256(
+      Buffer.concat([
+        this.lSeed!,
+        remoteSeed,
+        this.hashAuth(this.rawEmail, this.rawPassword)
+      ])
+    );
+
+    if (Buffer.compare(localAuthHash, serverHash) === 0) {
+      this.log.debug('Local auth hash matches server hash');
+      return {
+        remoteSeed,
+        authHash: localAuthHash
+      };
     }
 
-    const decodedKey = Buffer.from(key, 'base64');
-    const decrypted = crypto.privateDecrypt(
-      {
-        key: this.privateKey!,
-        padding: crypto.constants.RSA_PKCS1_PADDING
-      },
-      decodedKey
+    const emptyHash = this.sha256(
+      Buffer.concat([this.lSeed!, remoteSeed, this.hashAuth('', '')])
     );
 
-    const keyLen = 16;
+    if (Buffer.compare(emptyHash, serverHash) === 0) {
+      this.log.debug('Empty auth hash matches server hash');
+      return {
+        remoteSeed,
+        authHash: emptyHash
+      };
+    }
 
-    return new TpLinkCipher(
-      decrypted.subarray(0, keyLen),
-      decrypted.subarray(keyLen, keyLen * 2)
+    const testHash = this.sha256(
+      Buffer.concat([
+        this.lSeed!,
+        remoteSeed,
+        this.hashAuth(KlapAPI.TP_TEST_USER, KlapAPI.TP_TEST_PASSWORD)
+      ])
     );
+
+    if (Buffer.compare(testHash, serverHash) === 0) {
+      this.log.debug('Test auth hash matches server hash');
+      return {
+        remoteSeed,
+        authHash: testHash
+      };
+    }
+
+    this.session = undefined;
+    throw new Error('Failed to verify server hash');
   }
 
   private async sessionPost(path: string, payload: Buffer) {
     return axios.post(`http://${this.ip}/app${path}`, payload, {
+      responseType: 'arraybuffer',
       headers: {
         'Content-Type': 'application/octet-stream'
       }
     });
+  }
+
+  private sha256(data: Buffer) {
+    return crypto.createHash('sha256').update(data).digest();
+  }
+
+  private sha1(data: Buffer) {
+    return crypto.createHash('sha1').update(data).digest();
+  }
+
+  private hashAuth(email: string, password: string) {
+    return this.sha256(
+      Buffer.concat([
+        this.sha1(Buffer.from(email)),
+        this.sha1(Buffer.from(password))
+      ])
+    );
   }
 }
 
