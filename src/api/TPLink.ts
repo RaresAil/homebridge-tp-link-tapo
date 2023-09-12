@@ -8,7 +8,6 @@ import LegacyAPI from './LegacyAPI';
 import commands from './commands';
 import KlapAPI from './KlapAPI';
 import API from './@types/API';
-import axios from 'axios';
 
 export interface HandshakeData {
   cookie?: string;
