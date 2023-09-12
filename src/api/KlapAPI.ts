@@ -14,8 +14,6 @@ export default class KlapAPI extends API {
 
   private session?: Session;
 
-  private classSetup = false;
-
   private lSeed?: Buffer;
 
   constructor(
@@ -33,7 +31,7 @@ export default class KlapAPI extends API {
   }
 
   public async setup() {
-    this.classSetup = true;
+    this.log.debug('[KLAP] Legacy setup that does nothing, ignore this');
   }
 
   public async sendRequest(): Promise<AxiosResponse<any, any>> {
@@ -45,7 +43,7 @@ export default class KlapAPI extends API {
     params: {
       [key: string]: any;
     },
-    useToken = false,
+    _: boolean,
     forceHandshake = false
   ): Promise<{
     body: any;
@@ -53,48 +51,42 @@ export default class KlapAPI extends API {
   }> {
     await this.handshake(forceHandshake);
 
-    // const response = await axios.post(
-    //   `http://${this.ip}/app${useToken ? `?token=${this.loginToken!}` : ''}`,
+    // const requestData = this.session!.cipher!.encrypt(
     //   JSON.stringify({
-    //     method: 'securePassthrough',
-    //     params: {
-    //       request: this.tpLinkCipher!.encrypt(
-    //         JSON.stringify({
-    //           method,
-    //           params,
-    //           requestTimeMils: Date.now(),
-    //           terminalUUID: this.terminalUUID
-    //         })
-    //       )
-    //     }
-    //   }),
+    //     method,
+    //     params,
+    //     requestTimeMils: Date.now(),
+    //     terminalUUID: this.terminalUUID
+    //   })
+    // );
+
+    // console.log('REQUEST DATA', requestData);
+
+    // const response = await axios.post(
+    //   `http://${this.ip}/app/request`,
+    //   requestData.encrypted,
     //   {
+    //     params: {
+    //       seq: requestData.seq
+    //     },
     //     headers: {
     //       'Content-Type': 'application/json',
-    //       Cookie: this.handshakeData.cookie!
+    //       Cookie: this.session!.Cookie
     //     }
     //   }
     // );
 
-    // let body = response?.data;
-    // if (body?.result?.response) {
-    //   body = JSON.parse(this.tpLinkCipher!.decrypt(body.result.response));
-    // }
-
-    // return {
-    //   response,
-    //   body
-    // };
+    // console.log('RESPONSE', response);
 
     throw new Error('[KLAP] Not implemented yet');
   }
 
   public needsNewHandshake() {
-    if (!this.classSetup) {
-      throw new Error('Execute the .setup() first!');
+    if (!this.session) {
+      return true;
     }
 
-    if (!this.session) {
+    if (!this.session.cipher) {
       return true;
     }
 
@@ -116,7 +108,7 @@ export default class KlapAPI extends API {
       }
 
       const fHandshake = await this.firstHandshake();
-      const session = await this.secondHandshake(
+      await this.secondHandshake(
         this.lSeed!,
         fHandshake.remoteSeed,
         fHandshake.authHash
@@ -230,6 +222,10 @@ export default class KlapAPI extends API {
     } catch (e: any) {
       console.log('SECOND ERROR!', e.response);
     }
+
+    this.session = this.session!.completeHandshake(
+      new KlapCipher(localSeed, remoteSeed, authHash)
+    );
   }
 
   private async sessionPost(
@@ -272,11 +268,22 @@ export default class KlapAPI extends API {
 }
 
 class Session {
-  private handshakeCompleted = false;
-  private readonly expireAt: Date;
+  public readonly handshakeCompleted: boolean = false;
 
-  constructor(timeout: string, private cookie?: string) {
+  private readonly expireAt: Date;
+  private readonly rawTimeout: string;
+
+  constructor(
+    timeout: string,
+    private readonly cookie: string,
+    public readonly cipher?: KlapCipher
+  ) {
+    this.rawTimeout = timeout;
     this.expireAt = new Date(Date.now() + parseInt(timeout) * 1000);
+
+    if (cipher) {
+      this.handshakeCompleted = true;
+    }
   }
 
   public get IsExpired() {
@@ -287,8 +294,113 @@ class Session {
     return this.cookie;
   }
 
-  public invalidate() {
-    this.handshakeCompleted = false;
-    this.cookie = undefined;
+  public completeHandshake(cipher: KlapCipher) {
+    return new Session(this.rawTimeout, this.cookie, cipher);
+  }
+}
+
+class KlapCipher {
+  private readonly key: Buffer;
+  private readonly sig: Buffer;
+  private readonly iv: Buffer;
+  private seq: number;
+
+  constructor(localSeed: Buffer, remoteSeed: Buffer, authHash: Buffer) {
+    const { iv, seq } = this.ivDerive(localSeed, remoteSeed, authHash);
+    this.key = this.keyDerive(localSeed, remoteSeed, authHash);
+    this.sig = this.sigDerive(localSeed, remoteSeed, authHash);
+    this.iv = iv;
+    this.seq = seq;
+  }
+
+  public encrypt(msg: Buffer | string) {
+    this.seq += 1;
+
+    if (typeof msg === 'string') {
+      msg = Buffer.from(msg, 'utf8');
+    }
+
+    if (!Buffer.isBuffer(msg)) {
+      throw new Error('msg must be a string or buffer');
+    }
+
+    const cipher = crypto.createCipheriv('aes-256-cbc', this.key, this.ivSeq());
+    const blockSize = 16;
+    const paddingSize = blockSize - (msg.length % blockSize);
+    const paddedMsg = Buffer.concat([
+      msg,
+      Buffer.alloc(paddingSize, paddingSize)
+    ]);
+
+    const ciphertext = cipher.update(paddedMsg);
+    cipher.final();
+
+    const seqBuffer = Buffer.alloc(4);
+    seqBuffer.writeInt32BE(this.seq);
+
+    const hash = crypto.createHash('sha256');
+    hash.update(Buffer.concat([this.sig, seqBuffer, ciphertext]));
+
+    const signature = hash.digest();
+
+    return {
+      encrypted: Buffer.concat([signature, ciphertext]),
+      seq: this.seq
+    };
+  }
+
+  public decrypt(msg: Buffer) {
+    if (!Buffer.isBuffer(msg)) {
+      throw new Error('msg must be a buffer');
+    }
+
+    const decipher = crypto.createDecipheriv(
+      'aes-256-cbc',
+      this.key,
+      this.ivSeq()
+    );
+    const decrypted = Buffer.concat([
+      decipher.update(msg.subarray(32)),
+      decipher.final()
+    ]);
+
+    const paddingSize = decrypted[decrypted.length - 1];
+    const plaintextbytes = decrypted.subarray(
+      0,
+      decrypted.length - paddingSize
+    );
+
+    return plaintextbytes.toString('utf8');
+  }
+
+  private keyDerive(l: Buffer, r: Buffer, h: Buffer) {
+    const payload = Buffer.concat([Buffer.from('lsk'), l, r, h]);
+    const hash = crypto.createHash('sha256').update(payload).digest();
+    return hash;
+  }
+
+  private ivDerive(l: Buffer, r: Buffer, h: Buffer) {
+    const payload = Buffer.concat([Buffer.from('iv'), l, r, h]);
+    const fullIv = crypto.createHash('sha256').update(payload).digest();
+    const seq = fullIv.subarray(-4).readInt32BE(0);
+    return { iv: fullIv.subarray(0, 12), seq: seq };
+  }
+
+  private sigDerive(l: Buffer, r: Buffer, h: Buffer) {
+    const payload = Buffer.concat([Buffer.from('ldk'), l, r, h]);
+    const hash = crypto.createHash('sha256').update(payload).digest();
+    return hash.subarray(0, 28);
+  }
+
+  private ivSeq() {
+    const seq = Buffer.alloc(4);
+    seq.writeInt32BE(this.seq, 0);
+    const iv = Buffer.concat([this.iv, seq]);
+
+    if (iv.length !== 16) {
+      throw new Error('Length of iv is not 16');
+    }
+
+    return iv;
   }
 }
