@@ -6,6 +6,7 @@ import Protocol from './@types/Protocol';
 import { Logger } from 'homebridge';
 import LegacyAPI from './LegacyAPI';
 import commands from './commands';
+import KlapAPI from './KlapAPI';
 import API from './@types/API';
 import axios from 'axios';
 
@@ -74,12 +75,14 @@ export default class TPLink {
       }
 
       await this.api.setup();
-      this.classSetup = true;
 
       this._protocol = await this.checkProtocol();
       if (this._protocol === Protocol.KLAP) {
-        this.log.warn('KLAP protocol is not supported yet.');
+        this.api = new KlapAPI(this.ip, this.email, this.password, this.log);
+        await this.api.setup();
       }
+
+      this.classSetup = true;
     } catch (e) {
       this.log.error('Error setting up TPLink class:', e);
     }

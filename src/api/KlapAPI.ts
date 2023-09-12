@@ -141,23 +141,25 @@ export default class KlapAPI extends API {
 
   private async firstHandshake(seed?: Buffer) {
     this.lSeed = seed ? seed : crypto.randomBytes(16);
-    // const response = await this.sendRequest('handshake', {
-    //   key: this.publicKey!
-    // });
 
-    // console.log(
-    //   await this.sessionPost('/handshake1', this.lSeed.toString('base64'))
-    // );
+    const handshake1Result = await this.sessionPost('/handshake1', this.lSeed);
 
-    // const key = response?.data?.result?.key;
-    // const [cookie, timeout] =
-    //   response?.headers?.['set-cookie']?.[0]?.split(';') ?? [];
-    // const expire = parseInt((timeout ?? '').split('=')[1] ?? '0');
+    if (handshake1Result.status !== 200) {
+      throw new Error('Handshake1 failed');
+    }
 
-    // this.handshakeData.expire = Date.now() + expire * 1000;
-    // this.handshakeData.cookie = cookie;
+    if (handshake1Result.headers['content-length'] !== '48') {
+      throw new Error('Handshake1 failed due to invalid content length');
+    }
 
-    // this.tpLinkCipher = this.decodeHandshakeKey(key);
+    const cookie = handshake1Result.headers['set-cookie']?.[0];
+    const data = Buffer.from(handshake1Result.data);
+
+    const [session, timeout] = cookie!
+      .split(';')
+      .map((c) => c.split('=').pop());
+
+    console.log(new Session(timeout!, session!), data);
   }
 
   private decodeHandshakeKey(key: string) {
@@ -182,14 +184,29 @@ export default class KlapAPI extends API {
     );
   }
 
-  private async sessionPost(path: string, payload: string) {
+  private async sessionPost(path: string, payload: Buffer) {
     return axios.post(`http://${this.ip}/app${path}`, payload, {
       headers: {
-        // 'Content-Type': 'application/json',
-        // Cookie: cookie
+        'Content-Type': 'application/octet-stream'
       }
     });
   }
 }
 
-// class Session {}
+class Session {
+  private handshakeCompleted = false;
+  private readonly expireAt: Date;
+
+  constructor(timeout: string, private sessionId?: string) {
+    this.expireAt = new Date(Date.now() + parseInt(timeout) * 1000);
+  }
+
+  public get isExpired() {
+    return this.expireAt.getTime() - Date.now() <= 40 * 1000;
+  }
+
+  public invalidate() {
+    this.handshakeCompleted = false;
+    this.sessionId = undefined;
+  }
+}
