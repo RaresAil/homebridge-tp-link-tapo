@@ -74,6 +74,11 @@ export default class ContactAccessory extends Accessory {
         }
 
         const response = await this.hub.getChildLogs(this.deviceInfo.device_id);
+        if (!response) {
+          this.log.warn('Failed to check for updates, delaying 500ms');
+          await delay(500);
+        }
+
         const lastEvent = response?.logs?.[0];
         if (this.lastEventUpdate < lastEvent?.timestamp) {
           this.lastEventUpdate = lastEvent?.timestamp ?? 0;

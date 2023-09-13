@@ -69,9 +69,6 @@ export default {
     ({
       __method__: 'get_current_power'
     } as any),
-  checkProtocol: (): any => ({
-    __method__: 'component_nego'
-  }),
   childDeviceInfo: (childId: string): ChildResponse<ChildInfo> =>
     ({
       ...controlChild(childId, 'get_device_info')

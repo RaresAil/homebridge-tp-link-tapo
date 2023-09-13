@@ -9,6 +9,9 @@ abstract class API {
 
   protected loginToken?: string;
 
+  protected readonly rawEmail: string;
+  protected readonly rawPassword: string;
+
   constructor(
     protected readonly ip: string,
     protected readonly email: string,
@@ -18,6 +21,9 @@ abstract class API {
     this.email = TpLinkCipher.toBase64(TpLinkCipher.encodeUsername(this.email));
     this.password = TpLinkCipher.toBase64(this.password);
     this.terminalUUID = crypto.randomUUID();
+
+    this.rawEmail = email;
+    this.rawPassword = password;
   }
 
   public abstract login(): Promise<void>;
