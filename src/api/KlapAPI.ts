@@ -147,12 +147,9 @@ export default class KlapAPI extends API {
       cookieValue
     );
 
+    const localHash = this.hashAuth(this.rawEmail, this.rawPassword);
     const localAuthHash = this.sha256(
-      Buffer.concat([
-        localSeed,
-        remoteSeed,
-        this.hashAuth(this.rawEmail, this.rawPassword)
-      ])
+      Buffer.concat([localSeed, remoteSeed, localHash])
     );
 
     if (Buffer.compare(localAuthHash, serverHash) === 0) {
@@ -160,7 +157,7 @@ export default class KlapAPI extends API {
       return {
         localSeed,
         remoteSeed,
-        authHash: localAuthHash
+        authHash: localHash
       };
     }
 
@@ -215,14 +212,24 @@ export default class KlapAPI extends API {
         this.session!.Cookie
       );
 
-      console.log('SECOND!', handshake2Result);
+      if (handshake2Result.status === 200) {
+        this.log.debug('[KLAP] Second handshake successful');
+        this.session = this.session!.completeHandshake(
+          new KlapCipher(localSeed, remoteSeed, authHash)
+        );
+
+        return;
+      }
+
+      this.log.warn('[KLAP] Second handshake failed', handshake2Result.data);
     } catch (e: any) {
-      console.log('SECOND ERROR!', e.response);
+      this.log.error(
+        '[KLAP] Second handshake failed:',
+        e.response.data || e.message
+      );
     }
 
-    this.session = this.session!.completeHandshake(
-      new KlapCipher(localSeed, remoteSeed, authHash)
-    );
+    this.session = undefined;
   }
 
   private async sessionPost(
@@ -234,7 +241,7 @@ export default class KlapAPI extends API {
     return axios.post(`http://${this.ip}/app${path}`, payload, {
       responseType: responseType,
       headers: {
-        Accept: 'text/plain',
+        Accept: '*/*',
         'Content-Type': 'application/octet-stream',
         ...(cookie && {
           Cookie: cookie
