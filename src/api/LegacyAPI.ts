@@ -62,7 +62,7 @@ export default class LegacyAPI extends API {
             : {})
         },
         httpAgent: new http.Agent({
-          keepAlive: true
+          keepAlive: false
         })
       }
     );
@@ -108,7 +108,7 @@ export default class LegacyAPI extends API {
           Cookie: this.handshakeData.cookie!
         },
         httpAgent: new http.Agent({
-          keepAlive: true
+          keepAlive: false
         })
       }
     );

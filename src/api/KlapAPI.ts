@@ -252,7 +252,7 @@ export default class KlapAPI extends API {
         })
       },
       httpAgent: new http.Agent({
-        keepAlive: true
+        keepAlive: false
       })
     });
   }
