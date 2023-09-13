@@ -14,8 +14,6 @@ export default class KlapAPI extends API {
 
   private session?: Session;
 
-  private lSeed?: Buffer;
-
   constructor(
     protected readonly ip: string,
     protected readonly email: string,
@@ -107,21 +105,17 @@ export default class KlapAPI extends API {
         return;
       }
 
-      const fHandshake = await this.firstHandshake();
-      await this.secondHandshake(
-        this.lSeed!,
-        fHandshake.remoteSeed,
-        fHandshake.authHash
-      );
+      const { localSeed, remoteSeed, authHash } = await this.firstHandshake();
+      await this.secondHandshake(localSeed, remoteSeed, authHash);
     });
   }
 
   private async firstHandshake(seed?: Buffer) {
-    this.lSeed = seed ? seed : crypto.randomBytes(16);
+    const localSeed = seed ? seed : crypto.randomBytes(16);
 
     const handshake1Result = await this.sessionPost(
       '/handshake1',
-      this.lSeed,
+      localSeed,
       'arraybuffer'
     );
 
@@ -155,7 +149,7 @@ export default class KlapAPI extends API {
 
     const localAuthHash = this.sha256(
       Buffer.concat([
-        this.lSeed!,
+        localSeed,
         remoteSeed,
         this.hashAuth(this.rawEmail, this.rawPassword)
       ])
@@ -164,18 +158,20 @@ export default class KlapAPI extends API {
     if (Buffer.compare(localAuthHash, serverHash) === 0) {
       this.log.debug('[KLAP] Local auth hash matches server hash');
       return {
+        localSeed,
         remoteSeed,
         authHash: localAuthHash
       };
     }
 
     const emptyHash = this.sha256(
-      Buffer.concat([this.lSeed!, remoteSeed, this.hashAuth('', '')])
+      Buffer.concat([localSeed, remoteSeed, this.hashAuth('', '')])
     );
 
     if (Buffer.compare(emptyHash, serverHash) === 0) {
       this.log.debug('[KLAP] [WARN] Empty auth hash matches server hash');
       return {
+        localSeed,
         remoteSeed,
         authHash: emptyHash
       };
@@ -183,7 +179,7 @@ export default class KlapAPI extends API {
 
     const testHash = this.sha256(
       Buffer.concat([
-        this.lSeed!,
+        localSeed,
         remoteSeed,
         this.hashAuth(KlapAPI.TP_TEST_USER, KlapAPI.TP_TEST_PASSWORD)
       ])
@@ -192,6 +188,7 @@ export default class KlapAPI extends API {
     if (Buffer.compare(testHash, serverHash) === 0) {
       this.log.debug('[KLAP] [WARN] Test auth hash matches server hash');
       return {
+        localSeed,
         remoteSeed,
         authHash: testHash
       };
