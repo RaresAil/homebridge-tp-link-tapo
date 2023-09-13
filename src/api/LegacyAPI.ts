@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import axios from 'axios';
+import http from 'http';
 
 import TpLinkCipher from './TpLinkCipher';
 import { HandshakeData } from './TPLink';
@@ -59,7 +60,10 @@ export default class LegacyAPI extends API {
                 Cookie: this.handshakeData.cookie
               }
             : {})
-        }
+        },
+        httpAgent: new http.Agent({
+          keepAlive: true
+        })
       }
     );
 
@@ -102,7 +106,10 @@ export default class LegacyAPI extends API {
         headers: {
           'Content-Type': 'application/json',
           Cookie: this.handshakeData.cookie!
-        }
+        },
+        httpAgent: new http.Agent({
+          keepAlive: true
+        })
       }
     );
 
