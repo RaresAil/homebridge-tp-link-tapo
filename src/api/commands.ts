@@ -48,7 +48,7 @@ export default {
   getTriggerLogs: (childId: string): any => ({
     ...controlChild(childId, 'get_trigger_logs', {
       start_id: 0,
-      page_size: 1
+      page_size: 5
     })
   }),
   stopAlarm: (): boolean =>
