@@ -10,6 +10,7 @@ import {
 
 import Accessory, { AccessoryType, ChildType } from './@types/Accessory';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
+import { ChildInfo } from './api/@types/ChildListInfo';
 import DeviceInfo from './api/@types/DeviceInfo';
 import Context from './@types/Context';
 import TPLink from './api/TPLink';
@@ -17,10 +18,10 @@ import delay from './utils/delay';
 
 import HubAccessory, { HubContext } from './accessories/Hub';
 import LightBulbAccessory from './accessories/LightBulb';
-import OutletAccessory from './accessories/Outlet';
-import { ChildInfo } from './api/@types/ChildListInfo';
-import ButtonAccessory from './accessories/Button';
 import ContactAccessory from './accessories/Contact';
+import OutletAccessory from './accessories/Outlet';
+import ButtonAccessory from './accessories/Button';
+import MotionAccessory from './accessories/Motion';
 
 export default class Platform implements DynamicPlatformPlugin {
   private readonly TIMEOUT_TRIES = 20;
@@ -360,7 +361,8 @@ export default class Platform implements DynamicPlatformPlugin {
 
   private readonly childClasses = {
     [ChildType.Button]: ButtonAccessory,
-    [ChildType.Contact]: ContactAccessory
+    [ChildType.Contact]: ContactAccessory,
+    [ChildType.Motion]: MotionAccessory
   };
 
   private registerChild(
