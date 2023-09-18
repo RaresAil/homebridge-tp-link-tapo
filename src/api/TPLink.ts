@@ -172,7 +172,12 @@ export default class TPLink {
           this._prevPowerState = args[0] as boolean;
         }
 
-        return this.sendCommandWithNoLock(command, args, this._prevPowerState);
+        return this.sendCommandWithNoLock(
+          false,
+          command,
+          args,
+          this._prevPowerState
+        );
       }
     );
   }
@@ -185,12 +190,40 @@ export default class TPLink {
     return this.lock.acquire(
       `send-hub-command-${childId}`,
       (): Promise<CommandReturnType<T>> => {
-        return this.sendCommandWithNoLock(command, args, false);
+        return this.sendCommandWithNoLock(false, command, args, false);
+      }
+    );
+  }
+
+  public async sendCommandSuppressed<T extends Command>(
+    command: T,
+    ...args: Parameters<Commands[T]>
+  ): Promise<CommandReturnType<T>> {
+    return this.lock.acquire(
+      'send-command',
+      (): Promise<CommandReturnType<T>> => {
+        if (command === 'power') {
+          if (args[0] === this._prevPowerState) {
+            return this._prevPowerState as unknown as Promise<
+              CommandReturnType<T>
+            >;
+          }
+
+          this._prevPowerState = args[0] as boolean;
+        }
+
+        return this.sendCommandWithNoLock(
+          true,
+          command,
+          args,
+          this._prevPowerState
+        );
       }
     );
   }
 
   private async sendCommandWithNoLock<T extends Command>(
+    suppress: boolean,
     command: T,
     args: Parameters<Commands[T]>,
     isDeviceOn = false
@@ -201,7 +234,7 @@ export default class TPLink {
       }
 
       if (this.api.needsNewHandshake() || this.tryResendCommand) {
-        if (this.tryResendCommand) {
+        if (this.tryResendCommand && !suppress) {
           this.log.info('Trying to login again.');
         }
 
@@ -254,24 +287,32 @@ export default class TPLink {
         if (!this.tryResendCommand) {
           if (`${body.error_code}` === '9999') {
             this.tryResendCommand = true;
-            this.log.info('Session expired');
-            return this.sendCommandWithNoLock(command, args, isDeviceOn);
+            if (!suppress) {
+              this.log.info('Session expired');
+            }
+            return this.sendCommandWithNoLock(false, command, args, isDeviceOn);
           }
 
           if (`${body.error_code}` === '-1301') {
             this.tryResendCommand = true;
-            this.log.info('Rate limit exceeded. Renewing session.');
-            return this.sendCommandWithNoLock(command, args, isDeviceOn);
+            if (!suppress) {
+              this.log.info('Rate limit exceeded. Renewing session.');
+            }
+            return this.sendCommandWithNoLock(false, command, args, isDeviceOn);
           }
         }
 
-        this.log.error('Command error:', command, '>', body.error_code);
+        if (!suppress) {
+          this.log.error('Command error:', command, '>', body.error_code);
+        }
       }
 
       this.tryResendCommand = false;
       return (body?.result ?? body?.error_code === 0) as CommandReturnType<T>;
     } catch (e: any) {
-      this.log.error('Error sending command:', command, e);
+      if (!suppress) {
+        this.log.error('Error sending command:', command, e);
+      }
       this.tryResendCommand = false;
       return null as CommandReturnType<T>;
     }

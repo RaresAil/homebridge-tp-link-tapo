@@ -57,7 +57,7 @@ export default class LightBulbAccessory extends Accessory {
     );
 
     try {
-      const check = await this.tpLink.sendCommand('getCurrentPower');
+      const check = await this.tpLink.sendCommandSuppressed('getCurrentPower');
       if (
         check.current_power === undefined ||
         check.current_power === null ||
