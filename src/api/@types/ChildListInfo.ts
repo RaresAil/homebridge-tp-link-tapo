@@ -23,6 +23,7 @@ export interface ChildInfo {
   avatar: string;
   report_interval: number;
   region: string;
+  detected: boolean;
 }
 
 interface ChildListInfo {

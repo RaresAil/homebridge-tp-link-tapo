@@ -21,6 +21,7 @@ import OutletAccessory from './accessories/Outlet';
 import { ChildInfo } from './api/@types/ChildListInfo';
 import ButtonAccessory from './accessories/Button';
 import ContactAccessory from './accessories/Contact';
+import MotionSensorAccessory from './accessories/MotionSensor';
 
 export default class Platform implements DynamicPlatformPlugin {
   private readonly TIMEOUT_TRIES = 20;
@@ -360,7 +361,8 @@ export default class Platform implements DynamicPlatformPlugin {
 
   private readonly childClasses = {
     [ChildType.Button]: ButtonAccessory,
-    [ChildType.Contact]: ContactAccessory
+    [ChildType.Contact]: ContactAccessory,
+    [ChildType.MotionSensor]: MotionSensorAccessory,
   };
 
   private registerChild(
