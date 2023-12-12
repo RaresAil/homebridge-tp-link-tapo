@@ -87,43 +87,51 @@ export default class LegacyAPI extends API {
       }
     }
 
-    const response = await axios.post(
-      `http://${this.ip}/app${useToken ? `?token=${this.loginToken!}` : ''}`,
-      JSON.stringify({
-        method: 'securePassthrough',
-        params: {
-          request: this.tpLinkCipher!.encrypt(
-            JSON.stringify({
-              method,
-              params,
-              requestTimeMils: Date.now(),
-              terminalUUID: this.terminalUUID
-            })
-          )
+    try {
+      const response = await axios.post(
+        `http://${this.ip}/app${useToken ? `?token=${this.loginToken!}` : ''}`,
+        JSON.stringify({
+          method: 'securePassthrough',
+          params: {
+            request: this.tpLinkCipher!.encrypt(
+              JSON.stringify({
+                method,
+                params,
+                requestTimeMils: Date.now(),
+                terminalUUID: this.terminalUUID
+              })
+            )
+          }
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: this.handshakeData.cookie!
+          },
+          httpAgent: new http.Agent({
+            keepAlive: false
+          })
         }
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          Cookie: this.handshakeData.cookie!
-        },
-        httpAgent: new http.Agent({
-          keepAlive: false
-        })
+      );
+  
+      let body = response?.data;
+      if (body?.result?.response) {
+        body = JSON.parse(this.tpLinkCipher!.decrypt(body.result.response));
       }
-    );
-
-    let body = response?.data;
-    if (body?.result?.response) {
-      body = JSON.parse(this.tpLinkCipher!.decrypt(body.result.response));
+  
+      this.log.debug('[Send Secure Request]', JSON.stringify(body));
+  
+      return {
+        response,
+        body
+      };
+    } catch (error: any) {
+      if(error.response.status === 403 && !forceHandshake) {
+        this.log.warn("Forbidden. Redoing the request with a token regeneration.");
+        return this.sendSecureRequest(method, params, useToken, true);
+      }
+      throw new Error(`Request failed: ${error}`);
     }
-
-    this.log.debug('[Send Secure Request]', JSON.stringify(body));
-
-    return {
-      response,
-      body
-    };
   }
 
   public needsNewHandshake() {
