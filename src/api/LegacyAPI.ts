@@ -126,7 +126,7 @@ export default class LegacyAPI extends API {
         body
       };
     } catch (error: any) {
-      if(error.response.status === 403 && !forceHandshake) {
+      if(error.response?.status === 403 && !forceHandshake) {
         this.log.warn("Forbidden. Redoing the request with a token regeneration.");
         return this.sendSecureRequest(method, params, useToken, true);
       }
