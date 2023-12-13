@@ -58,26 +58,34 @@ export default class KlapAPI extends API {
 
     const requestData = this.session!.cipher!.encrypt(rawRequest);
 
-    const response = await this.sessionPost(
-      '/request',
-      requestData.encrypted,
-      'arraybuffer',
-      this.session!.Cookie,
-      {
-        seq: requestData.seq.toString()
+    try {
+      const response = await this.sessionPost(
+        '/request',
+        requestData.encrypted,
+        'arraybuffer',
+        this.session!.Cookie,
+        {
+          seq: requestData.seq.toString()
+        }
+      );
+  
+      if (response.status !== 200) {
+        throw new Error('[KLAP] Request failed');
       }
-    );
-
-    if (response.status !== 200) {
-      throw new Error('[KLAP] Request failed');
+  
+      const data = JSON.parse(this.session!.cipher!.decrypt(response.data));
+  
+      return {
+        response,
+        body: data
+      };
+    } catch(error:any) {
+      if(error.response?.status === 403 && !forceHandshake) {
+        this.log.warn("[KLAP] Forbidden. Redoing the request with a token regeneration.");
+        return this.sendSecureRequest(method, params, _, true);
+      }
+      throw new Error(`[KLAP] Request failed: ${error}`);
     }
-
-    const data = JSON.parse(this.session!.cipher!.decrypt(response.data));
-
-    return {
-      response,
-      body: data
-    };
   }
 
   public needsNewHandshake() {
