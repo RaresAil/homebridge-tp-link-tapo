@@ -1,6 +1,6 @@
 # Homebridge TP-Link Tapo
 
-[![Discord](https://img.shields.io/discord/942035865658613790.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/CAvGGvRGB3)
+## This plugin has been archived and it will no longer receive updates
 
 [![Build and Lint](https://github.com/RaresAil/homebridge-tp-link-tapo/actions/workflows/build.yml/badge.svg)](https://github.com/RaresAil/homebridge-tp-link-tapo/actions/workflows/build.yml)
 [![CodeQL](https://github.com/RaresAil/homebridge-tp-link-tapo/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/RaresAil/homebridge-tp-link-tapo/actions/workflows/codeql-analysis.yml)
